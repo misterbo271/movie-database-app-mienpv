@@ -5,6 +5,7 @@ export default {
   tertiaryColor: '#8E8E93',
   whiteColor: '#FFFFFF',
   blackColor: '#000000',
+  grayColor: '#F8F8F8',
 
   tabBarColor: '#032541',
   tabBarTextColor: '#FFFFFF',

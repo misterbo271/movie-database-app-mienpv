@@ -105,6 +105,13 @@ android {
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }
     }
+
+    // Copy custom fonts to the "assets" directory in Android
+    sourceSets {
+        main {
+            assets.srcDirs = ['src/main/assets', '../../src/assets/fonts']
+        }
+    }
 }
 
 dependencies {

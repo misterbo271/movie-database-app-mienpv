@@ -13,7 +13,6 @@ const CBIcon: React.FC<CBIconProps> = (props) => {
     }
   };
   
-  // Helper function để lấy màu dựa trên define
   const getIconColor = (define: string, scheme: string): string => {
     switch (define) {
       case 'primary':
@@ -33,7 +32,6 @@ const CBIcon: React.FC<CBIconProps> = (props) => {
     }
   };
   
-  // Ưu tiên color từ props, nếu không có thì lấy từ define
   const iconColor = props.color || getIconColor(props.define || '', theme.colors.scheme);
   
   return <Icon {...props} color={iconColor} />;
