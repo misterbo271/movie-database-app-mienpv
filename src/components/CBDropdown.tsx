@@ -1,9 +1,13 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
+  TouchableWithoutFeedback,
+  Modal,
+  Dimensions,
+  LayoutChangeEvent,
 } from 'react-native';
 import { Icon } from '@rneui/themed';
 import colors from '../configs/colors';
@@ -22,6 +26,12 @@ interface CBDropdownProps {
   containerStyle?: any;
 }
 
+interface DropdownPosition {
+  top: number;
+  left: number;
+  width: number;
+}
+
 const CBDropdown: React.FC<CBDropdownProps> = ({
   options,
   defaultValue,
@@ -32,38 +42,40 @@ const CBDropdown: React.FC<CBDropdownProps> = ({
   const [selectedOption, setSelectedOption] = useState<DropdownOption | undefined>(
     defaultValue ? options.find(option => option.value === defaultValue) : options[0]
   );
+  const [position, setPosition] = useState<DropdownPosition>({ top: 0, left: 0, width: 0 });
+  const buttonRef = useRef<View>(null);
+  
+  // Measure button position when dropdown is opened
+  const measureButton = () => {
+    if (buttonRef.current) {
+      buttonRef.current.measure((x, y, width, height, pageX, pageY) => {
+        setPosition({
+          top: pageY + height,
+          left: pageX,
+          width: width,
+        });
+        setIsVisible(true);
+      });
+    }
+  };
   
   const toggleDropdown = () => {
-    setIsVisible(!isVisible);
+    if (!isVisible) {
+      measureButton();
+    } else {
+      setIsVisible(false);
+    }
+  };
+
+  const closeDropdown = () => {
+    setIsVisible(false);
   };
 
   const handleSelect = (option: DropdownOption) => {
     setSelectedOption(option);
     onSelect(option);
-    toggleDropdown();
+    closeDropdown();
   };
-
-  const renderItem = ({ item, index }: { item: DropdownOption, index: number }) => (
-    <TouchableOpacity
-      key={index}
-      style={[
-        styles.option,
-        selectedOption?.value === item.value && styles.selectedOption,
-        index === 0 && styles.firstOption,
-        index === options.length - 1 && styles.lastOption,
-      ]}
-      onPress={() => handleSelect(item)}
-    >
-      <Text 
-        style={[
-          styles.optionText,
-          selectedOption?.value === item.value && styles.selectedOptionText,
-        ]}
-      >
-        {item.label}
-      </Text>
-    </TouchableOpacity>
-  );
 
   return (
     <View style={[styles.container, containerStyle]}>
@@ -72,6 +84,7 @@ const CBDropdown: React.FC<CBDropdownProps> = ({
           style={styles.dropdownButton} 
           onPress={toggleDropdown}
           activeOpacity={0.7}
+          ref={buttonRef}
         >
           <Text style={appStyles.content}>{selectedOption?.label}</Text>
           <Icon
@@ -82,14 +95,52 @@ const CBDropdown: React.FC<CBDropdownProps> = ({
           />
         </TouchableOpacity>
       
-        {isVisible && (
-          <View style={styles.dropdown}>
-            <View style={styles.dropdownContent}>
-              {options.map((item, index) => renderItem({ item, index }))}
+        <Modal
+          visible={isVisible}
+          transparent={true}
+          animationType="none"
+          onRequestClose={closeDropdown}
+        >
+          <TouchableWithoutFeedback onPress={closeDropdown}>
+            <View style={styles.modalOverlay}>
+              <View
+                style={[
+                  styles.dropdown,
+                  {
+                    position: 'absolute',
+                    top: position.top,
+                    left: position.left,
+                    width: position.width,
+                  }
+                ]}
+              >
+                <View style={styles.dropdownContent}>
+                  {options.map((item, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={[
+                        styles.option,
+                        selectedOption?.value === item.value && styles.selectedOption,
+                        index === 0 && styles.firstOption,
+                        index === options.length - 1 && styles.lastOption,
+                      ]}
+                      onPress={() => handleSelect(item)}
+                    >
+                      <Text 
+                        style={[
+                          styles.optionText,
+                          selectedOption?.value === item.value && styles.selectedOptionText,
+                        ]}
+                      >
+                        {item.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
             </View>
-          </View>
-        )}
-
+          </TouchableWithoutFeedback>
+        </Modal>
       </View>
     </View>
   );
@@ -98,7 +149,7 @@ const CBDropdown: React.FC<CBDropdownProps> = ({
 const styles = StyleSheet.create({
   container: {
     position: 'relative',
-    zIndex: 5000,
+    zIndex: 1,
   },
   dropdownContainer: {
     position: 'relative',
@@ -119,12 +170,12 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 2,
   },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
   dropdown: {
-    position: 'absolute',
-    top: '100%',
-    left: 0,
-    right: 0,
-    backgroundColor: 'white',
+    backgroundColor: 'transparent',
     borderRadius: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
@@ -132,7 +183,6 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 6,
     zIndex: 5001,
-    marginTop: 1,
   },
   dropdownContent: {
     backgroundColor: 'white',
