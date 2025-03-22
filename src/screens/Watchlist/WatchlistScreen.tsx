@@ -109,7 +109,28 @@ const WatchlistScreen: React.FC = observer(() => {
    */
   const loadWatchlist = async () => {
     console.log(`Loading watchlist with sort: ${sortValue}`);
-    await moviesStore.loadWatchlist(sortValue);
+    try {
+      // Make the API call
+      const watchlistData = await moviesStore.fetchWatchlist(1, sortValue);
+      
+      // Log the exact data returned
+      console.log('=== WATCHLIST API RESPONSE ===');
+      console.log(`Total items returned: ${watchlistData.length}`);
+      
+      // Log the first item as an example
+      if (watchlistData.length > 0) {
+        console.log('First item example:');
+        console.log(JSON.stringify(watchlistData[0], null, 2));
+      } else {
+        console.log('No items returned from API');
+      }
+      
+      // Log all movie IDs for reference
+      console.log('All movie IDs in watchlist:');
+      console.log(watchlistData.map(movie => movie.id).join(', '));
+    } catch (error) {
+      console.error('Error in loadWatchlist:', error);
+    }
   };
   
   /**
@@ -212,66 +233,6 @@ const WatchlistScreen: React.FC = observer(() => {
   };
   
   /**
-   * Render movie item
-   */
-  const renderMovie: ListRenderItem<Movie> = ({ item }) => (
-    <CBView style={styles.watchlistItemContainer}>
-      <TouchableOpacity 
-        style={styles.watchlistItem}
-        onPress={() => handleMoviePress(item)}
-        activeOpacity={0.7}
-      >
-        <CBImage 
-          source={{ uri: moviesStore.getPosterUrl(item.poster_path, 'small') }}
-          style={styles.watchlistPoster}
-          resizeMode="cover"
-        />
-        <CBView style={styles.watchlistItemInfo}>
-          <CBText variant="h4" style={styles.watchlistItemTitle} numberOfLines={1}>
-            {item.title}
-          </CBText>
-          <CBText variant="body" style={styles.watchlistItemDate}>
-            {item.release_date ? new Date(item.release_date).toLocaleDateString('en-US', {
-              day: 'numeric',
-              month: 'long',
-              year: 'numeric'
-            }) : 'No release date'}
-          </CBText>
-          <CBText variant="body" style={styles.watchlistItemOverview} numberOfLines={2}>
-            {item.overview || 'No overview available'}
-          </CBText>
-        </CBView>
-      </TouchableOpacity>
-      
-      <TouchableOpacity 
-        style={styles.removeButton}
-        onPress={() => handleRemoveMovie(item.id)}
-        disabled={removingMovieId === item.id}
-      >
-        {removingMovieId === item.id ? (
-          <ActivityIndicator size="small" color={colors.primaryColor} />
-        ) : (
-          <Icon name="close" type="material" size={18} color="#999" />
-        )}
-      </TouchableOpacity>
-    </CBView>
-  );
-  
-  /**
-   * Render empty state when no movies are in watchlist
-   */
-  const renderEmptyContent = () => (
-    <CBView style={styles.emptyContainer}>
-      <CBText variant="h4" style={styles.emptyText}>
-        Your watchlist is empty
-      </CBText>
-      <CBText variant="body" style={styles.emptySubtext}>
-        Add movies to your watchlist to see them here
-      </CBText>
-    </CBView>
-  );
-  
-  /**
    * Render avatar with image or initial fallback
    */
   const renderAvatar = () => {
@@ -296,17 +257,18 @@ const WatchlistScreen: React.FC = observer(() => {
   };
   
   /**
-   * Render loading state
+   * Render empty state when no movies are in watchlist
    */
-  const renderLoading = () => {
-    if (!loading) return null;
-    
-    return (
-      <CBView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.primaryColor} />
-      </CBView>
-    );
-  };
+  const renderEmptyContent = () => (
+    <CBView style={styles.emptyContainer}>
+      <CBText variant="h4" style={styles.emptyText}>
+        Your watchlist is empty
+      </CBText>
+      <CBText variant="body" style={styles.emptySubtext}>
+        Add movies to your watchlist to see them here
+      </CBText>
+    </CBView>
+  );
   
   // Create the FlatList with empty state
   const MovieList = WithEmptyState(FlatList) as React.ComponentType<
@@ -314,7 +276,8 @@ const WatchlistScreen: React.FC = observer(() => {
   >;
 
   return (
-    <ScreenContainer contentContainerStyle={{paddingHorizontal: 0}} backgroundColor={colors.whiteColor}>
+    <ScreenContainer backgroundColor={colors.whiteColor}>
+      {/* Header with logo */}
       <CBView style={styles.header}>
         <CBImage 
           source="ic_logo" 
@@ -383,21 +346,64 @@ const WatchlistScreen: React.FC = observer(() => {
           </CBView>
         </CBView>
         
-        {/* Movie List */}
-        <MovieList
-          data={moviesStore.watchlistMovies}
-          renderItem={renderMovie as any}
-          keyExtractor={(item: any) => item.id.toString()}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-          emptyComponent={renderEmptyContent()}
-          isEmpty={!loading && moviesStore.watchlistMovies.length === 0}
-          onRefresh={handleRefresh}
-          refreshing={loading}
-        />
-        
-        {/* Loading Indicator */}
-        {renderLoading()}
+        {/* Basic FlatList for Watchlist Movies */}
+        {loading ? (
+          <CBView style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.primaryColor} />
+          </CBView>
+        ) : (
+          <FlatList
+            data={moviesStore.watchlistMovies}
+            renderItem={({ item }) => (
+              <CBView style={styles.watchlistItemContainer}>
+                <TouchableOpacity 
+                  style={styles.watchlistItem}
+                  onPress={() => handleMoviePress(item)}
+                  activeOpacity={0.7}
+                >
+                  <CBImage 
+                    source={{ uri: moviesStore.getPosterUrl(item.poster_path, 'small') }}
+                    style={styles.watchlistPoster}
+                    resizeMode="cover"
+                  />
+                  <CBView style={styles.watchlistItemInfo}>
+                    <CBText variant="h4" style={styles.watchlistItemTitle} numberOfLines={1}>
+                      {item.title}
+                    </CBText>
+                    <CBText variant="body" style={styles.watchlistItemDate}>
+                      {item.release_date ? new Date(item.release_date).toLocaleDateString('en-US', {
+                        day: 'numeric',
+                        month: 'long',
+                        year: 'numeric'
+                      }) : 'No release date'}
+                    </CBText>
+                    <CBText variant="body" style={styles.watchlistItemOverview} numberOfLines={2}>
+                      {item.overview || 'No overview available'}
+                    </CBText>
+                  </CBView>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={styles.removeButton}
+                  onPress={() => handleRemoveMovie(item.id)}
+                  disabled={removingMovieId === item.id}
+                >
+                  {removingMovieId === item.id ? (
+                    <ActivityIndicator size="small" color={colors.primaryColor} />
+                  ) : (
+                    <Icon name="close" type="material" size={18} color="#999" />
+                  )}
+                </TouchableOpacity>
+              </CBView>
+            )}
+            keyExtractor={item => item.id.toString()}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={renderEmptyContent}
+            onRefresh={handleRefresh}
+            refreshing={false}
+          />
+        )}
       </CBView>
     </ScreenContainer>
   );

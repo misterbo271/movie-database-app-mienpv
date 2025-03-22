@@ -560,26 +560,51 @@ class MoviesStore {
       
       // Make the API request exactly as in the curl command
       const url = `/account/21896145/watchlist/movies?language=en-US&page=${page}&sort_by=${sortBy}`;
-      console.log('Requesting:', url);
+      console.log('Requesting URL:', url);
       
       const response = await movieAPI.get<MovieResponse>(url);
       
+      // Log the full response for debugging
+      console.log('API Response Status:', response.status);
+      console.log('API Response Headers:', response.headers);
+      console.log('API Response Data Structure:');
+      console.log(`- page: ${response.data.page}`);
+      console.log(`- total_results: ${response.data.total_results}`);
+      console.log(`- total_pages: ${response.data.total_pages}`);
+      console.log(`- results.length: ${response.data.results?.length || 0}`);
+      
+      // Show first result if available
+      if (response.data.results && response.data.results.length > 0) {
+        console.log('First result structure:');
+        const keys = Object.keys(response.data.results[0]);
+        console.log('Keys:', keys.join(', '));
+      }
+      
       // Update the watchlist in the store
       runInAction(() => {
-        this.watchlistMovies = response.data.results;
+        // Double check we have valid results
+        if (Array.isArray(response.data.results)) {
+          this.watchlistMovies = response.data.results;
+          console.log(`✅ Watchlist loaded successfully with ${response.data.results.length} movies`);
+        } else {
+          console.error('⚠️ Invalid response format: results is not an array');
+          this.watchlistMovies = [];
+        }
+        
         this.loading.search = false;
-        console.log(`✅ Watchlist loaded successfully with ${response.data.results.length} movies`);
         
         // Log some sample watchlist items
-        if (response.data.results.length > 0) {
+        if (this.watchlistMovies.length > 0) {
           console.log('Sample watchlist items:');
-          response.data.results.slice(0, 3).forEach((movie, index) => {
+          this.watchlistMovies.slice(0, 3).forEach((movie, index) => {
             console.log(`  ${index + 1}. ${movie.title} (${movie.release_date?.split('-')[0] || 'N/A'}) - Rating: ${movie.vote_average}`);
           });
+        } else {
+          console.log('⚠️ No watchlist items found');
         }
       });
       
-      return response.data.results;
+      return response.data.results || [];
     } catch (error) {
       console.error('Error fetching watchlist:', error);
       
