@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import { StyleSheet, FlatList, ListRenderItem, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { StyleSheet, FlatList, ListRenderItem, TouchableOpacity, Image, ActivityIndicator, TouchableWithoutFeedback } from 'react-native';
 import { observer } from 'mobx-react-lite';
 import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Icon } from '@rneui/themed';
 
@@ -38,10 +39,9 @@ interface WithEmptyStateProps {
 
 // Filter and sort options
 const FILTER_OPTIONS = [
-  { label: 'Rating', value: 'vote_average.desc' },
-  { label: 'Date Added', value: 'created_at.asc' },
-  { label: 'Alphabetical', value: 'title.asc' },
-  { label: 'Release Date', value: 'release_date.desc' }
+  { label: 'Rating', value: 'vote_average', direction: 'desc' },
+  { label: 'Alphabetical order', value: 'title', direction: 'asc' },
+  { label: 'Release Date', value: 'release_date', direction: 'desc' }
 ];
 
 // Sort order options
@@ -64,28 +64,80 @@ const WatchlistScreen: React.FC = observer(() => {
   const moviesStore = useMoviesStore();
   
   // Local state
-  const [selectedFilter, setSelectedFilter] = useState(FILTER_OPTIONS[1]); // Default to "Date Added"
+  const [selectedFilter, setSelectedFilter] = useState(FILTER_OPTIONS[1]); // Default to "Alphabetical order"
   const [isAscending, setIsAscending] = useState(true);
   const [loading, setLoading] = useState(true);
   const [filterMenuOpen, setFilterMenuOpen] = useState(false);
   const [removingMovieId, setRemovingMovieId] = useState<number | null>(null);
   
-  // Computed sort value
-  const sortValue = isAscending 
-    ? selectedFilter.value 
-    : SORT_ORDERS[selectedFilter.value as keyof typeof SORT_ORDERS];
-
-  // Load watchlist data and user profile on mount
-  useEffect(() => {
-    loadData();
-  }, []);
+  // Ref to track previous data state
+  const previousDataRef = useRef<{
+    watchlistCount: number;
+    lastFetchTime: number;
+  }>({
+    watchlistCount: 0,
+    lastFetchTime: 0
+  });
   
-  // Load data when sort parameters change
-  useEffect(() => {
-    if (!loading) {
-      loadWatchlist();
+  // Load watchlist data and user profile only when needed
+  useFocusEffect(
+    useCallback(() => {
+      const checkAndLoadData = async () => {
+        // Check if we should reload data
+        const shouldReload = shouldReloadData();
+        
+        if (shouldReload) {
+          console.log('Watchlist screen focused - data needs to be reloaded');
+          await loadData();
+          
+          // Update our reference after loading
+          previousDataRef.current = {
+            watchlistCount: moviesStore.watchlistMovies.length,
+            lastFetchTime: Date.now()
+          };
+        } else {
+          console.log('Watchlist screen focused - using cached data');
+          setLoading(false);
+        }
+      };
+      
+      checkAndLoadData();
+      
+      // Return a cleanup function if needed
+      return () => {
+        // cleanup if needed
+      };
+    }, [])
+  );
+  
+  /**
+   * Determine if data should be reloaded
+   */
+  const shouldReloadData = (): boolean => {
+    // Always reload if this is the first load
+    if (previousDataRef.current.lastFetchTime === 0) {
+      console.log('First load - loading data');
+      return true;
     }
-  }, [sortValue]);
+    
+    // Check if the current watchlist count is different from the previous one
+    const currentWatchlistCount = moviesStore.watchlistMovies.length;
+    if (currentWatchlistCount !== previousDataRef.current.watchlistCount) {
+      console.log(`Watchlist count changed: ${previousDataRef.current.watchlistCount} -> ${currentWatchlistCount}`);
+      return true;
+    }
+    
+    // Check if data is more than 2 minutes old
+    const dataAge = Date.now() - previousDataRef.current.lastFetchTime;
+    const TWO_MINUTES = 2 * 60 * 1000;
+    
+    if (dataAge > TWO_MINUTES) {
+      console.log(`Data is old (${Math.round(dataAge / 1000)}s) - reloading`);
+      return true;
+    }
+    
+    return false;
+  };
   
   /**
    * Load user profile and watchlist data
@@ -97,41 +149,59 @@ const WatchlistScreen: React.FC = observer(() => {
       // Fetch user profile
       await moviesStore.getUserProfile();
       
-      // Load watchlist with current sort
-      await loadWatchlist();
+      // Load watchlist with default sort (we'll sort locally after)
+      await moviesStore.fetchWatchlist(1);
     } finally {
       setLoading(false);
     }
   };
   
   /**
-   * Load watchlist with current sort parameters
+   * Sort the watchlist data locally based on current filter and sort direction
    */
-  const loadWatchlist = async () => {
-    console.log(`Loading watchlist with sort: ${sortValue}`);
-    try {
-      // Make the API call
-      const watchlistData = await moviesStore.fetchWatchlist(1, sortValue);
+  const sortedWatchlistMovies = useMemo(() => {
+    if (!moviesStore.watchlistMovies || moviesStore.watchlistMovies.length === 0) {
+      return [];
+    }
+    
+    const { value, direction } = selectedFilter;
+    const sortDirection = isAscending ? 1 : -1;
+    
+    // Create a copy to avoid mutating the original data
+    return [...moviesStore.watchlistMovies].sort((a, b) => {
+      let valueA, valueB;
       
-      // Log the exact data returned
-      console.log('=== WATCHLIST API RESPONSE ===');
-      console.log(`Total items returned: ${watchlistData.length}`);
-      
-      // Log the first item as an example
-      if (watchlistData.length > 0) {
-        console.log('First item example:');
-        console.log(JSON.stringify(watchlistData[0], null, 2));
-      } else {
-        console.log('No items returned from API');
+      // Handle special case for sorting by rating
+      if (value === 'vote_average') {
+        valueA = a.vote_average || 0;
+        valueB = b.vote_average || 0;
+      }
+      // Handle special case for title (case insensitive)
+      else if (value === 'title') {
+        valueA = a.title?.toLowerCase() || '';
+        valueB = b.title?.toLowerCase() || '';
+      }
+      // Handle release date
+      else if (value === 'release_date') {
+        valueA = a.release_date ? new Date(a.release_date).getTime() : 0;
+        valueB = b.release_date ? new Date(b.release_date).getTime() : 0;
+      }
+      // Default fallback
+      else {
+        valueA = a[value as keyof Movie] || '';
+        valueB = b[value as keyof Movie] || '';
       }
       
-      // Log all movie IDs for reference
-      console.log('All movie IDs in watchlist:');
-      console.log(watchlistData.map(movie => movie.id).join(', '));
-    } catch (error) {
-      console.error('Error in loadWatchlist:', error);
-    }
-  };
+      // Apply consistent sorting logic
+      if (valueA < valueB) {
+        return (direction === 'asc' ? -1 : 1) * sortDirection;
+      }
+      if (valueA > valueB) {
+        return (direction === 'asc' ? 1 : -1) * sortDirection;
+      }
+      return 0;
+    });
+  }, [moviesStore.watchlistMovies, selectedFilter, isAscending]);
   
   /**
    * Handle back button press
@@ -207,28 +277,38 @@ const WatchlistScreen: React.FC = observer(() => {
     if (!filterMenuOpen) return null;
     
     return (
-      <CBView style={styles.filterMenu}>
-        {FILTER_OPTIONS.map((option) => (
-          <TouchableOpacity
-            key={option.value}
-            style={[
-              styles.filterMenuItem,
-              selectedFilter.value === option.value && styles.filterMenuItemSelected
-            ]}
-            onPress={() => handleFilterPress(option)}
-          >
-            <CBText
-              variant="body"
+      <>
+        <TouchableOpacity 
+          style={styles.filterMenuOverlay}
+          activeOpacity={1}
+          onPress={() => {
+            console.log('Overlay pressed');
+            setFilterMenuOpen(false);
+          }}
+        />
+        <CBView style={styles.filterMenu}>
+          {FILTER_OPTIONS.map((option) => (
+            <TouchableOpacity
+              key={option.value}
               style={[
-                styles.filterMenuItemText,
-                selectedFilter.value === option.value && styles.filterMenuItemTextSelected
+                styles.filterMenuItem,
+                selectedFilter.value === option.value && styles.filterMenuItemSelected
               ]}
+              onPress={() => handleFilterPress(option)}
             >
-              {option.label}
-            </CBText>
-          </TouchableOpacity>
-        ))}
-      </CBView>
+              <CBText
+                variant="body"
+                style={[
+                  styles.filterMenuItemText,
+                  selectedFilter.value === option.value && styles.filterMenuItemTextSelected
+                ]}
+              >
+                {option.label}
+              </CBText>
+            </TouchableOpacity>
+          ))}
+        </CBView>
+      </>
     );
   };
   
@@ -270,13 +350,61 @@ const WatchlistScreen: React.FC = observer(() => {
     </CBView>
   );
   
+  /**
+   * Render movie item
+   */
+  const renderMovie = useCallback(({ item }: { item: Movie }) => {
+    return (
+      <CBView style={styles.watchlistItemContainer}>
+        <TouchableOpacity 
+          style={styles.watchlistItem}
+          onPress={() => handleMoviePress(item)}
+          activeOpacity={0.7}
+        >
+          <CBImage 
+            source={{ uri: moviesStore.getPosterUrl(item.poster_path, 'small') }}
+            style={styles.watchlistPoster}
+            resizeMode="cover"
+          />
+          <CBView style={styles.watchlistItemInfo}>
+            <CBText variant="h4" style={styles.watchlistItemTitle} numberOfLines={1}>
+              {item.title}
+            </CBText>
+            <CBText variant="body" style={styles.watchlistItemDate}>
+              {item.release_date ? new Date(item.release_date).toLocaleDateString('en-US', {
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric'
+              }) : 'No release date'}
+            </CBText>
+            <CBText variant="body" style={styles.watchlistItemOverview} numberOfLines={2}>
+              {item.overview || 'No overview available'}
+            </CBText>
+          </CBView>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={styles.removeButton}
+          onPress={() => handleRemoveMovie(item.id)}
+          disabled={removingMovieId === item.id}
+        >
+          {removingMovieId === item.id ? (
+            <ActivityIndicator size="small" color={colors.primaryColor} />
+          ) : (
+            <Icon name="close" type="material" size={18} color="#999" />
+          )}
+        </TouchableOpacity>
+      </CBView>
+    );
+  }, [moviesStore, removingMovieId]);
+  
   // Create the FlatList with empty state
   const MovieList = WithEmptyState(FlatList) as React.ComponentType<
     WithEmptyStateProps & React.ComponentProps<typeof FlatList>
   >;
 
   return (
-    <ScreenContainer backgroundColor={colors.whiteColor}>
+    <ScreenContainer contentContainerStyle={{paddingHorizontal: 0}} backgroundColor={colors.whiteColor}>
       {/* Header with logo */}
       <CBView style={styles.header}>
         <CBImage 
@@ -346,56 +474,15 @@ const WatchlistScreen: React.FC = observer(() => {
           </CBView>
         </CBView>
         
-        {/* Basic FlatList for Watchlist Movies */}
+        {/* FlatList for Watchlist Movies */}
         {loading ? (
           <CBView style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={colors.primaryColor} />
           </CBView>
         ) : (
           <FlatList
-            data={moviesStore.watchlistMovies}
-            renderItem={({ item }) => (
-              <CBView style={styles.watchlistItemContainer}>
-                <TouchableOpacity 
-                  style={styles.watchlistItem}
-                  onPress={() => handleMoviePress(item)}
-                  activeOpacity={0.7}
-                >
-                  <CBImage 
-                    source={{ uri: moviesStore.getPosterUrl(item.poster_path, 'small') }}
-                    style={styles.watchlistPoster}
-                    resizeMode="cover"
-                  />
-                  <CBView style={styles.watchlistItemInfo}>
-                    <CBText variant="h4" style={styles.watchlistItemTitle} numberOfLines={1}>
-                      {item.title}
-                    </CBText>
-                    <CBText variant="body" style={styles.watchlistItemDate}>
-                      {item.release_date ? new Date(item.release_date).toLocaleDateString('en-US', {
-                        day: 'numeric',
-                        month: 'long',
-                        year: 'numeric'
-                      }) : 'No release date'}
-                    </CBText>
-                    <CBText variant="body" style={styles.watchlistItemOverview} numberOfLines={2}>
-                      {item.overview || 'No overview available'}
-                    </CBText>
-                  </CBView>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={styles.removeButton}
-                  onPress={() => handleRemoveMovie(item.id)}
-                  disabled={removingMovieId === item.id}
-                >
-                  {removingMovieId === item.id ? (
-                    <ActivityIndicator size="small" color={colors.primaryColor} />
-                  ) : (
-                    <Icon name="close" type="material" size={18} color="#999" />
-                  )}
-                </TouchableOpacity>
-              </CBView>
-            )}
+            data={sortedWatchlistMovies}
+            renderItem={renderMovie}
             keyExtractor={item => item.id.toString()}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
@@ -463,7 +550,7 @@ const styles = StyleSheet.create({
   watchlistContainer: {
     flex: 1,
     backgroundColor: colors.whiteColor,
-    paddingHorizontal: moderateScale(16),
+    paddingHorizontal: moderateScale(24),
     paddingTop: moderateScale(24),
   },
   watchlistTitle: {
@@ -500,6 +587,17 @@ const styles = StyleSheet.create({
   sortButton: {
     padding: moderateScale(4),
   },
+  filterMenuOverlay: {
+    position: 'absolute',
+    top: -1000,
+    left: -1000,
+    right: -1000,
+    bottom: -1000,
+    width: 5000, // Much larger than screen
+    height: 5000, // Much larger than screen
+    backgroundColor: 'transparent',
+    zIndex: 999,
+  },
   filterMenu: {
     position: 'absolute',
     top: moderateScale(30),
@@ -512,7 +610,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 4,
-    zIndex: 1000,
+    zIndex: 1001,
   },
   filterMenuItem: {
     paddingVertical: moderateScale(8),
