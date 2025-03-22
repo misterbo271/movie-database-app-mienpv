@@ -1,6 +1,7 @@
 import { makeAutoObservable, runInAction } from 'mobx';
 import CBConfigs from '../configs/CBConfigs';
 import axios from 'axios';
+import DateUtil from '@utils/DateUtil';
 
 /**
  * Interface for a movie item
@@ -133,47 +134,77 @@ class MoviesStore {
     });
     
     try {
-      // Determine API endpoint based on category
+      // Determine API endpoint and parameters based on category
       let endpoint = '';
+      let params: Record<string, any> = {
+        language: 'en-US',
+        page: page,
+        include_adult: false,
+        include_video: false
+      };
       
       switch (category) {
         case 'now_playing':
-          endpoint = '/movie/now_playing';
+          // Using discover endpoint for now playing movies (released in the last 60 days)
+          endpoint = '/discover/movie';
+          
+          // Get dates using DateUtil
+          const pastDateStr = DateUtil.getDateDaysAgo(60);
+          const currentDateStr = DateUtil.getCurrentDateFormatted();
+          
+          params = {
+            include_adult: false,
+            include_video: false,
+            language: 'en-US',
+            page: page,
+            sort_by: 'popularity.desc',
+            with_release_type: '2|3', // 2=Theatrical, 3=Digital
+            'release_date.gte': pastDateStr,
+            'release_date.lte': currentDateStr
+          };
           break;
-        case 'upcoming':
-          endpoint = '/movie/upcoming';
-          break;
+          
         case 'popular':
-          endpoint = '/movie/popular';
+          // Using discover endpoint with popularity sorting for popular movies
+          endpoint = '/discover/movie';
+          params = {
+            ...params,
+            sort_by: 'popularity.desc'
+          };
           break;
+          
+        case 'upcoming':
+          // Using discover endpoint for upcoming movies as specified in the curl command
+          endpoint = '/discover/movie';
+          
+          // Get dates using DateUtil
+          const tomorrowStr = DateUtil.getDateDaysFromNow(1);
+          const maxDateStr = DateUtil.getDateMonthsFromNow(2);
+          
+          params = {
+            include_adult: false,
+            include_video: false,
+            language: 'en-US',
+            page: page,
+            sort_by: 'popularity.desc',
+            with_release_type: '2|3', // 2=Theatrical, 3=Digital
+            'release_date.gte': tomorrowStr,
+            'release_date.lte': maxDateStr
+          };
+          break;
+          
         default:
           throw new Error('Invalid category');
       }
-
-      console.log(`\n🎬 FETCHING ${category.toUpperCase()} MOVIES - Page ${page}`);
-      console.log(`🌐 API Call: ${CBConfigs.tmdb.baseUrl}${endpoint}`);
       
       // Call API using axios
-      const response = await movieAPI.get<MovieResponse>(endpoint, {
-        params: {
-          language: 'en-US',
-          page: page
-        }
-      });
-      
-      // For debugging in terminal 
-      console.log(`✅ API Response for ${category}:`, {
-        status: response.status,
-        totalResults: response.data.total_results,
-        totalPages: response.data.total_pages,
-        resultsCount: response.data.results.length
-      });
+      const response = await movieAPI.get<MovieResponse>(endpoint, { params });
       
       // Show some sample movies
       if (response.data.results.length > 0) {
         console.log('📽️ Sample movies:');
         response.data.results.slice(0, 3).forEach((movie, index) => {
-          console.log(`  ${index + 1}. ${movie.title} (${movie.release_date.split('-')[0]}) - Rating: ${movie.vote_average}`);
+          console.log(`  ${index + 1}. ${movie.title} (${movie.release_date?.split('-')[0] || 'N/A'}) - Rating: ${movie.vote_average}`);
         });
       }
       

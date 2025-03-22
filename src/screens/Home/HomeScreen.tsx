@@ -19,6 +19,10 @@ import CBButton from '@components/CBButton';
 import CBCard from '@components/CBCard';
 import WithLoading from '@components/hoc/WithLoading';
 
+// Utils
+import DateUtil from '@utils/DateUtil';
+import TimeUtil from '@utils/TimeUtil';
+
 // Types
 import { Movie, MovieCategory } from '@stores/MoviesStore';
 
@@ -32,19 +36,29 @@ const CATEGORY_OPTIONS: DropdownOption[] = [
 ];
 
 /**
- * Helper function to format release date
+ * Helper function to format release date using DateUtil
  */
 const formatReleaseDate = (releaseDate: string): string => {
-  try {
-    const date = new Date(releaseDate);
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-  } catch (e) {
-    return releaseDate;
+  if (!releaseDate) return 'N/A';
+  return DateUtil.formatDate(releaseDate, 'YYYY-MM-DD', 'MMMM DD, YYYY');
+};
+
+/**
+ * Helper function to get relative time or coming soon status
+ */
+const getRelativeReleaseInfo = (releaseDate: string): string => {
+  if (!releaseDate) return '';
+  
+  // Check if movie is upcoming and show "coming soon" label
+  if (DateUtil.isDateInFuture(releaseDate)) {
+    if (TimeUtil.isComingSoon(releaseDate)) {
+      return '🔥 Coming Soon!';
+    }
+    return `Coming in ${TimeUtil.getTimeUntilString(releaseDate)}`;
   }
+  
+  // For released movies, show how long ago they were released
+  return `Released ${TimeUtil.formatRelativeTime(releaseDate)}`;
 };
 
 /**
@@ -118,6 +132,17 @@ const MovieList: React.FC<MovieListProps> = ({ movies, loading, onMoviePress, li
               {/* Release date */}
               <CBText variant="caption" style={styles.releaseDate}>
                 {formatReleaseDate(item.release_date)}
+              </CBText>
+              
+              {/* Relative time info */}
+              <CBText 
+                variant="caption" 
+                style={[
+                  styles.releaseInfo,
+                  DateUtil.isDateInFuture(item.release_date) ? styles.upcomingText : styles.releasedText
+                ]}
+              >
+                {getRelativeReleaseInfo(item.release_date)}
               </CBText>
               
               {/* Overview */}
@@ -384,7 +409,10 @@ const HomeScreen: React.FC = observer(() => {
     
     return (
       <CBView style={styles.moviesContainer}>
-
+        {/* Category title */}
+        <CBText variant="h4" style={styles.categoryTitle}>
+          {`${selectedCategory.label} Movies`}
+        </CBText>
         
         {/* Movie list in grid layout */}
         <MovieListWithLoading
@@ -553,6 +581,16 @@ const styles = StyleSheet.create({
   releaseDate: {
     color: colors.tertiaryTextColor,
     marginBottom: moderateScale(12),
+  },
+  releaseInfo: {
+    marginBottom: moderateScale(8),
+    fontWeight: '500',
+  },
+  upcomingText: {
+    color: colors.primaryColor,
+  },
+  releasedText: {
+    color: colors.tertiaryTextColor,
   },
   overview: {
     color: colors.secondaryTextColor,
