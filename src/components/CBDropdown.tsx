@@ -24,6 +24,7 @@ interface CBDropdownProps {
   containerStyle?: any;
   isOpen?: boolean;
   onToggleDropdown?: (isOpen: boolean) => void;
+  label?: string;
 }
 
 const CBDropdown: React.FC<CBDropdownProps> = ({
@@ -33,6 +34,7 @@ const CBDropdown: React.FC<CBDropdownProps> = ({
   containerStyle,
   isOpen,
   onToggleDropdown,
+  label,
 }) => {
   // Use internal state if isOpen prop is not provided
   const [internalIsVisible, setInternalIsVisible] = useState<boolean>(false);
@@ -85,7 +87,7 @@ const CBDropdown: React.FC<CBDropdownProps> = ({
         onPress={toggleDropdown}
         activeOpacity={0.7}
       >
-        <Text style={appStyles.content}>{selectedOption?.label}</Text>
+        <Text style={appStyles.content}>{label || selectedOption?.label}</Text>
         <Icon
           name={isVisible ? 'keyboard-arrow-down' : 'keyboard-arrow-right'}
           type="material"

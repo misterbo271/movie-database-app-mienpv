@@ -30,10 +30,9 @@ import { Movie, MovieCategory } from '@stores/MoviesStore';
  * Sort options for movie lists
  */
 const SORT_OPTIONS: DropdownOption[] = [
-  { label: 'Popularity', value: 'popularity.desc' },
-  { label: 'Release Date', value: 'release_date.desc' },
-  { label: 'Title (A-Z)', value: 'title.asc' },
-  { label: 'Rating', value: 'vote_average.desc' },
+  { label: 'By alphabetical order', value: 'title.asc' },
+  { label: 'By rating', value: 'vote_average.desc' },
+  { label: 'By release date', value: 'release_date.desc' },
 ];
 
 /**
@@ -198,6 +197,7 @@ const HomeScreen: React.FC = observer(() => {
   const [visibleMovies, setVisibleMovies] = useState<number>(5); // Number of movies to display
   const [selectedSort, setSelectedSort] = useState<DropdownOption>(SORT_OPTIONS[0]);
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
+  const [isSortDropdownOpen, setIsSortDropdownOpen] = useState<boolean>(false);
   
   // Get data from store based on selected category
   const getMoviesByCategory = (category: string): Movie[] => {
@@ -248,6 +248,17 @@ const HomeScreen: React.FC = observer(() => {
         moviesStore.fetchPopularMovies();
         break;
     }
+  };
+
+  /**
+   * Handler for sort selection
+   * @param option - The selected sort option
+   */
+  const handleSortSelect = (option: DropdownOption) => {
+    // Hide keyboard if showing
+    Keyboard.dismiss();
+    
+    setSelectedSort(option);
   };
 
   /**
@@ -340,21 +351,21 @@ const HomeScreen: React.FC = observer(() => {
           options={CATEGORY_OPTIONS}
           defaultValue={selectedCategory.value}
           onSelect={handleCategorySelect}
-          containerStyle={styles.dropdown}
+          containerStyle={[styles.dropdown, { zIndex: 1002 }]}
           isOpen={isDropdownOpen}
           onToggleDropdown={setIsDropdownOpen}
         />
 
-        {/* Sort button */}
-        <CBView define="card" style={styles.filterButton}>
-          <CBText variant="body">Sort by: {selectedSort.label}</CBText>
-          <Icon
-            name="chevron-right"
-            type="material-community"
-            color={colors.secondaryColor}
-            size={20}
-          />
-        </CBView>
+        {/* Sort dropdown */}
+        <CBDropdown
+          options={SORT_OPTIONS}
+          defaultValue={selectedSort.value}
+          onSelect={handleSortSelect}
+          containerStyle={[styles.dropdown, { zIndex: 1001 }]}
+          isOpen={isSortDropdownOpen}
+          onToggleDropdown={setIsSortDropdownOpen}
+          label="Sort by"
+        />
 
         {/* Search section */}
         <CBView style={styles.searchContainer}>
@@ -515,13 +526,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   filterContainer: {
-    paddingHorizontal: moderateScale(16),
-    paddingBottom: moderateScale(16),
-    position: 'relative',
+    flexDirection: 'column',
+    marginHorizontal: 16,
+    marginBottom: 16,
+    gap: 12,
   },
   dropdown: {
-    marginBottom: moderateScale(16),
+    marginBottom: 0,
     position: 'relative',
+    zIndex: 1000, // Higher z-index for category dropdown
   },
   filterButton: {
     flexDirection: 'row',
