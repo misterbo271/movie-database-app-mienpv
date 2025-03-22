@@ -15,6 +15,7 @@ export interface Movie {
   vote_average: number;
   overview: string;
   genre_ids: number[];
+  original_title?: string;
 }
 
 /**
@@ -30,7 +31,7 @@ interface MovieResponse {
 /**
  * Types of movie listings
  */
-export type MovieCategory = 'now_playing' | 'upcoming' | 'popular';
+export type MovieCategory = 'now_playing' | 'upcoming' | 'popular' | 'search';
 
 // Create axios instance with default config
 const movieAPI = axios.create({
@@ -55,26 +56,30 @@ class MoviesStore {
   loading: {[key in MovieCategory]: boolean} = {
     now_playing: false,
     upcoming: false,
-    popular: false
+    popular: false,
+    search: false
   };
   
   error: {[key in MovieCategory]: string | null} = {
     now_playing: null,
     upcoming: null,
-    popular: null
+    popular: null,
+    search: null
   };
   
   // Pagination
   currentPage: {[key in MovieCategory]: number} = {
     now_playing: 1,
     upcoming: 1,
-    popular: 1
+    popular: 1,
+    search: 1
   };
   
   totalPages: {[key in MovieCategory]: number} = {
     now_playing: 0,
     upcoming: 0,
-    popular: 0
+    popular: 0,
+    search: 0
   };
 
   constructor() {
@@ -244,53 +249,78 @@ class MoviesStore {
   }
 
   /**
-   * Search movies by keyword
-   * @param query Search keyword
-   * @param page Page number
+   * Search movies by query
+   * @param query Search query
+   * @returns Array of movies matching the query
    */
-  async searchMovies(query: string, page = 1): Promise<Movie[]> {
-    if (!query.trim()) {
-      return [];
-    }
+  searchMovies = async (query: string): Promise<Movie[]> => {
+    // Mark as loading
+    runInAction(() => {
+      this.loading['search'] = true;
+      this.error['search'] = null;
+    });
     
     try {
-      console.log(`\n🔎 SEARCHING MOVIES: "${query}" - Page ${page}`);
+      // Trim the query to remove any leading/trailing whitespace
+      const trimmedQuery = query.trim();
       
-      // Call API using axios
-      const response = await movieAPI.get<MovieResponse>('/search/movie', {
-        params: {
-          query: query,
-          language: 'en-US',
-          page: page
-        }
-      });
-      
-      // Log results for debugging
-      console.log(`✅ Search Results:`, {
-        query: query,
-        resultsCount: response.data.results.length,
-        totalResults: response.data.total_results,
-        totalPages: response.data.total_pages
-      });
-      
-      // Show some sample results
-      if (response.data.results.length > 0) {
-        console.log('📽️ Top search results:');
-        response.data.results.slice(0, 5).forEach((movie, index) => {
-          console.log(`  ${index + 1}. ${movie.title} (${movie.release_date?.split('-')[0] || 'N/A'}) - Rating: ${movie.vote_average}`);
+      // If query is empty after trimming, return empty array
+      if (!trimmedQuery) {
+        runInAction(() => {
+          this.loading['search'] = false;
         });
-        console.log('\n');
-      } else {
-        console.log('❓ No results found for this search query\n');
+        return [];
       }
       
-      return response.data.results;
+      // Split search terms for better matching
+      const searchTerms = trimmedQuery.toLowerCase().split(' ');
       
+      // Call the search API
+      const response = await movieAPI.get<MovieResponse>(
+        `/search/movie?query=${encodeURIComponent(trimmedQuery)}`
+      );
+      
+      // Filter results to include partial matches
+      let filteredResults = response.data.results.filter(movie => {
+        const title = movie.title.toLowerCase();
+        const originalTitle = movie.original_title?.toLowerCase() || '';
+        
+        // Check if any search term is included in either title
+        return searchTerms.some(term => 
+          title.includes(term) || originalTitle.includes(term)
+        );
+      });
+      
+      // Sort results by release date (newest first)
+      filteredResults.sort((a, b) => {
+        if (!a.release_date) return 1;
+        if (!b.release_date) return -1;
+        return new Date(b.release_date).getTime() - new Date(a.release_date).getTime();
+      });
+      
+      console.log(`Search for "${trimmedQuery}" found ${filteredResults.length} filtered results out of ${response.data.results.length} total`);
+      
+      runInAction(() => {
+        this.loading['search'] = false;
+      });
+      
+      if (filteredResults.length > 0) {
+        return filteredResults;
+      } else {
+        console.log('No search results found');
+        return [];
+      }
     } catch (error) {
-      console.error('❌ Error searching movies:', error);
+      console.error('Error searching movies:', error);
+      runInAction(() => {
+        this.loading['search'] = false;
+        this.error['search'] = axios.isAxiosError(error) 
+          ? error.message || `Error ${(error as any).response?.status}` 
+          : 'Unknown error';
+      });
       return [];
     }
-  }
+  };
 
   /**
    * Convert poster path from TMDB API to full image URL

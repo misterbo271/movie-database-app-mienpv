@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, FlatList, ScrollView, View, TouchableOpacity } from 'react-native';
+import { StyleSheet, FlatList, ScrollView, View, TouchableOpacity, Keyboard } from 'react-native';
 import { observer } from 'mobx-react-lite';
 import { Icon } from '@rneui/themed';
 import { moderateScale } from '@utils/ThemeUtil';
@@ -25,6 +25,16 @@ import TimeUtil from '@utils/TimeUtil';
 
 // Types
 import { Movie, MovieCategory } from '@stores/MoviesStore';
+
+/**
+ * Sort options for movie lists
+ */
+const SORT_OPTIONS: DropdownOption[] = [
+  { label: 'Popularity', value: 'popularity.desc' },
+  { label: 'Release Date', value: 'release_date.desc' },
+  { label: 'Title (A-Z)', value: 'title.asc' },
+  { label: 'Rating', value: 'vote_average.desc' },
+];
 
 /**
  * Category options for the dropdown filter
@@ -134,17 +144,6 @@ const MovieList: React.FC<MovieListProps> = ({ movies, loading, onMoviePress, li
                 {formatReleaseDate(item.release_date)}
               </CBText>
               
-              {/* Relative time info */}
-              <CBText 
-                variant="caption" 
-                style={[
-                  styles.releaseInfo,
-                  DateUtil.isDateInFuture(item.release_date) ? styles.upcomingText : styles.releasedText
-                ]}
-              >
-                {getRelativeReleaseInfo(item.release_date)}
-              </CBText>
-              
               {/* Overview */}
               <CBText variant="body" numberOfLines={2} style={styles.overview}>
                 {item.overview}
@@ -196,8 +195,9 @@ const HomeScreen: React.FC = observer(() => {
   const [selectedCategory, setSelectedCategory] = useState<DropdownOption>(CATEGORY_OPTIONS[0]);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [searchResults, setSearchResults] = useState<Movie[]>([]);
-  const [isSearching, setIsSearching] = useState<boolean>(false);
-  const [visibleMovies, setVisibleMovies] = useState<number>(5); // Số phim hiển thị
+  const [visibleMovies, setVisibleMovies] = useState<number>(5); // Number of movies to display
+  const [selectedSort, setSelectedSort] = useState<DropdownOption>(SORT_OPTIONS[0]);
+  const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
   
   // Get data from store based on selected category
   const getMoviesByCategory = (category: string): Movie[] => {
@@ -229,8 +229,11 @@ const HomeScreen: React.FC = observer(() => {
    * @param option - The selected category option
    */
   const handleCategorySelect = (option: DropdownOption) => {
+    // Hide keyboard if showing
+    Keyboard.dismiss();
+    
     setSelectedCategory(option);
-    setVisibleMovies(5); // Reset số phim hiển thị khi chuyển category
+    setVisibleMovies(5); // Reset number of visible movies when changing category
     const category = option.value as MovieCategory;
     
     // Fetch data if needed
@@ -253,12 +256,18 @@ const HomeScreen: React.FC = observer(() => {
    */
   const handleSearch = async () => {
     if (searchQuery.trim()) {
-      setIsSearching(true);
-      setVisibleMovies(5); // Reset số phim hiển thị khi tìm kiếm mới
+      setVisibleMovies(5); // Reset number of visible movies when performing a new search
       const results = await moviesStore.searchMovies(searchQuery);
       setSearchResults(results);
-      setIsSearching(false);
     }
+  };
+
+  /**
+   * Check if search button should be active
+   * @returns boolean
+   */
+  const isSearchActive = (): boolean => {
+    return searchQuery.trim().length > 0;
   };
 
   /**
@@ -277,6 +286,14 @@ const HomeScreen: React.FC = observer(() => {
    */
   const handleLoadMore = () => {
     setVisibleMovies(prev => prev + 5);
+  };
+
+  /**
+   * Handler for search input change
+   * Just update the query, don't trigger search
+   */
+  const handleSearchInputChange = (text: string) => {
+    setSearchQuery(text);
   };
 
   // Load initial data
@@ -302,7 +319,6 @@ const HomeScreen: React.FC = observer(() => {
     }
   }, []);
 
-
   /**
    * Render the header with logo and filters
    */
@@ -325,15 +341,17 @@ const HomeScreen: React.FC = observer(() => {
           defaultValue={selectedCategory.value}
           onSelect={handleCategorySelect}
           containerStyle={styles.dropdown}
+          isOpen={isDropdownOpen}
+          onToggleDropdown={setIsDropdownOpen}
         />
 
         {/* Sort button */}
-        <CBView define="card" style={styles.sortButton}>
-          <CBText variant="body">Sort by</CBText>
+        <CBView define="card" style={styles.filterButton}>
+          <CBText variant="body">Sort by: {selectedSort.label}</CBText>
           <Icon
             name="chevron-right"
             type="material-community"
-            color={colors.primaryColor}
+            color={colors.secondaryColor}
             size={20}
           />
         </CBView>
@@ -341,25 +359,28 @@ const HomeScreen: React.FC = observer(() => {
         {/* Search section */}
         <CBView style={styles.searchContainer}>
           <CBInput
-            placeholder="Search for movies..."
+            placeholder="Search..."
             value={searchQuery}
-            onChangeText={setSearchQuery}
+            onChangeText={handleSearchInputChange}
             variant="outline"
-            rightIcon={
-              <Icon
-                name="magnify"
-                type="material-community"
-                color={colors.primaryColor}
-                size={20}
-              />
-            }
+            style={styles.searchInput}
+            inputWrapperStyle={styles.searchInputWrapper}
+            placeholderTextColor="#9E9E9E"
           />
-          <CBButton
-            title="Search"
-            variant="primary"
+          <TouchableOpacity
+            style={[
+              styles.searchButton,
+              isSearchActive() ? styles.searchButtonActive : styles.searchButtonInactive
+            ]}
             onPress={handleSearch}
-            style={styles.searchButton}
-          />
+          >
+            <CBText 
+              variant="button" 
+              style={styles.searchButtonText}
+            >
+              Search
+            </CBText>
+          </TouchableOpacity>
         </CBView>
       </CBView>
     </>
@@ -382,13 +403,13 @@ const HomeScreen: React.FC = observer(() => {
           </CBText>
           <MovieListWithLoading
             movies={limitedSearchResults}
-            loading={isSearching}
+            loading={moviesStore.loading.search}
             onMoviePress={handleMoviePress}
             listType="grid"
           />
           
           {/* Load more button for search results */}
-          {!isSearching && hasMoreSearchResults && (
+          {!moviesStore.loading.search && hasMoreSearchResults && (
             <CBButton
               title="Load More"
               variant="primary"
@@ -409,10 +430,6 @@ const HomeScreen: React.FC = observer(() => {
     
     return (
       <CBView style={styles.moviesContainer}>
-        {/* Category title */}
-        <CBText variant="h4" style={styles.categoryTitle}>
-          {`${selectedCategory.label} Movies`}
-        </CBText>
         
         {/* Movie list in grid layout */}
         <MovieListWithLoading
@@ -460,14 +477,20 @@ const HomeScreen: React.FC = observer(() => {
       backgroundColor={colors.containerColor}
       statusBarStyle="dark-content"
     >
-      <ScrollView 
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        {renderHeader()}
-        {renderMovieSections()}
-        {renderEmptyState()}
-      </ScrollView>
+      <View style={{ flex: 1 }}>
+        <ScrollView 
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          scrollEnabled={true}
+          nestedScrollEnabled={true}
+          pointerEvents="box-none"
+        >
+          {renderHeader()}
+          {renderMovieSections()}
+          {renderEmptyState()}
+        </ScrollView>
+      </View>
     </ScreenContainer>
   );
 });
@@ -487,11 +510,13 @@ const styles = StyleSheet.create({
   filterContainer: {
     paddingHorizontal: moderateScale(16),
     paddingBottom: moderateScale(16),
+    position: 'relative',
   },
   dropdown: {
     marginBottom: moderateScale(16),
+    position: 'relative',
   },
-  sortButton: {
+  filterButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -501,9 +526,45 @@ const styles = StyleSheet.create({
   },
   searchContainer: {
     marginBottom: moderateScale(16),
+    position: 'relative',
+  },
+  searchInput: {
+    marginBottom: moderateScale(12),
+    borderRadius: moderateScale(4),
+    borderWidth: 1,
+    borderColor: '#E3E3E3',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  searchInputWrapper: {
+    backgroundColor: colors.whiteColor,
+    borderWidth: 1,
+    borderColor: '#E3E3E3',
+    borderRadius: moderateScale(4),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   searchButton: {
-    marginTop: moderateScale(8),
+    height: moderateScale(48),
+    borderRadius: moderateScale(40),
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  searchButtonActive: {
+    backgroundColor: colors.primaryColor,
+  },
+  searchButtonInactive: {
+    backgroundColor: '#E0E0E0',
+  },
+  searchButtonText: {
+    color: colors.whiteColor,
+    fontWeight: '600',
   },
   moviesContainer: {
     paddingHorizontal: moderateScale(16),

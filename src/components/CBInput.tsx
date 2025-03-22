@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   TextInput,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ViewStyle,
   TextStyle,
+  Keyboard,
 } from 'react-native';
 import colors from '../configs/colors';
 import fonts from '../configs/fonts';
@@ -20,6 +21,12 @@ type InputVariant =
   | 'default'
   | 'filled'
   | 'outline';
+
+// Create a type for the outside click handler with blur method
+interface OutsideClickHandler {
+  (): void;
+  blurInput?: () => void;
+}
 
 /**
  * Props interface for CBInput component
@@ -75,6 +82,14 @@ interface CBInputProps extends TextInputProps {
    * Whether the input is disabled
    */
   disabled?: boolean;
+  /**
+   * Callback when input is focused
+   */
+  onInputFocus?: () => void;
+  /**
+   * Callback when input should be blurred (when touching outside)
+   */
+  onOutsideClick?: OutsideClickHandler;
 }
 
 /**
@@ -111,11 +126,14 @@ const CBInput: React.FC<CBInputProps> = (props) => {
     inputStyle,
     required = false,
     disabled = false,
+    onInputFocus,
+    onOutsideClick,
     ...restProps
   } = props;
 
   const [isFocused, setIsFocused] = useState(false);
   const [secureTextEntry, setSecureTextEntry] = useState(isPassword);
+  const inputRef = useRef<TextInput>(null);
 
   // Get the input container style based on variant and state
   const inputContainerStyle = getInputContainerStyle(variant, isFocused, !!error, disabled);
@@ -124,6 +142,55 @@ const CBInput: React.FC<CBInputProps> = (props) => {
   const toggleSecureEntry = () => {
     setSecureTextEntry(!secureTextEntry);
   };
+
+  // Handle input focus
+  const handleFocus = (e: any) => {
+    setIsFocused(true);
+    if (onInputFocus) {
+      onInputFocus();
+    }
+    if (restProps.onFocus) {
+      restProps.onFocus(e);
+    }
+  };
+
+  // Handle input blur
+  const handleBlur = (e: any) => {
+    console.log('CBInput: handleBlur called');
+    setIsFocused(false);
+    if (restProps.onBlur) {
+      restProps.onBlur(e);
+    }
+  };
+
+  // Public method to blur the input from outside
+  const blurInput = () => {
+    console.log('CBInput: blurInput called');
+    
+    // Bỏ focus khỏi input
+    if (inputRef.current) {
+      inputRef.current.blur();
+    }
+    
+    // Cập nhật state ngay lập tức để đảm bảo UI phản ứng
+    setIsFocused(false);
+    
+    // Đảm bảo bàn phím biến mất
+    Keyboard.dismiss();
+  };
+
+  // Handle outside click through useEffect when onOutsideClick changes
+  useEffect(() => {
+    if (onOutsideClick) {
+      // Expose the blur method to parent component
+      onOutsideClick.blurInput = blurInput;
+    }
+    return () => {
+      if (onOutsideClick && onOutsideClick.blurInput) {
+        onOutsideClick.blurInput = undefined;
+      }
+    };
+  }, [onOutsideClick]);
 
   return (
     <View style={[styles.container, containerStyle]}>
@@ -150,6 +217,7 @@ const CBInput: React.FC<CBInputProps> = (props) => {
         
         <TextInput
           {...restProps}
+          ref={inputRef}
           style={[
             styles.input,
             leftIcon ? styles.inputWithLeftIcon : undefined,
@@ -158,15 +226,9 @@ const CBInput: React.FC<CBInputProps> = (props) => {
             disabled ? styles.disabledInput : undefined,
           ]}
           secureTextEntry={secureTextEntry}
-          onFocus={(e) => {
-            setIsFocused(true);
-            restProps.onFocus && restProps.onFocus(e);
-          }}
-          onBlur={(e) => {
-            setIsFocused(false);
-            restProps.onBlur && restProps.onBlur(e);
-          }}
-          placeholderTextColor={colors.grayColor}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
+          placeholderTextColor={colors.grayTextColor}
           editable={!disabled}
         />
         
@@ -218,6 +280,7 @@ const getInputContainerStyle = (
     case 'filled':
       baseStyle.backgroundColor = '#F0F0F0'; // Light gray background
       baseStyle.borderBottomWidth = 1;
+      
       baseStyle.borderBottomColor = colors.grayColor;
       break;
     case 'outline':
@@ -225,6 +288,8 @@ const getInputContainerStyle = (
       baseStyle.borderColor = colors.grayColor;
       break;
     default: // default variant
+      baseStyle.borderWidth = 1;
+      baseStyle.borderColor = '#E3E3E3';
       baseStyle.borderBottomWidth = 1;
       baseStyle.borderBottomColor = colors.grayColor;
       break;
@@ -235,6 +300,8 @@ const getInputContainerStyle = (
     if (variant === 'outline') {
       baseStyle.borderColor = colors.primaryColor;
     } else {
+      baseStyle.borderWidth = 1;
+      baseStyle.borderColor = '#E3E3E3';
       baseStyle.borderBottomColor = colors.primaryColor;
     }
   }
@@ -281,11 +348,12 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    fontFamily: fonts.fontFamily.regular,
-    fontSize: moderateScale(14),
+    fontFamily: fonts.fontFamily.semibold,
+    fontSize: moderateScale(16),
     color: colors.primaryTextColor,
     padding: 0,
     height: '100%',
+ 
   },
   inputWithLeftIcon: {
     paddingLeft: moderateScale(8),

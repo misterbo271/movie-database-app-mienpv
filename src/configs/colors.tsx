@@ -6,6 +6,7 @@ export default {
   whiteColor: '#FFFFFF',
   blackColor: '#000000',
   grayColor: '#F8F8F8',
+  lightPrimaryColor: '#E6F9FF',
 
   tabBarColor: '#032541',
   tabBarTextColor: '#FFFFFF',
@@ -15,4 +16,5 @@ export default {
   secondaryTextColor: '#555770',
   tertiaryTextColor: '#8F90A6',
   errorTextColor: '#FF3B3B',
+  grayTextColor: '#999999',
 };

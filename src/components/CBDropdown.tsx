@@ -1,13 +1,11 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   TouchableWithoutFeedback,
-  Modal,
   Dimensions,
-  LayoutChangeEvent,
 } from 'react-native';
 import { Icon } from '@rneui/themed';
 import colors from '../configs/colors';
@@ -24,12 +22,8 @@ interface CBDropdownProps {
   defaultValue?: string;
   onSelect: (option: DropdownOption) => void;
   containerStyle?: any;
-}
-
-interface DropdownPosition {
-  top: number;
-  left: number;
-  width: number;
+  isOpen?: boolean;
+  onToggleDropdown?: (isOpen: boolean) => void;
 }
 
 const CBDropdown: React.FC<CBDropdownProps> = ({
@@ -37,38 +31,32 @@ const CBDropdown: React.FC<CBDropdownProps> = ({
   defaultValue,
   onSelect,
   containerStyle,
+  isOpen,
+  onToggleDropdown,
 }) => {
-  const [isVisible, setIsVisible] = useState<boolean>(false);
+  // Use internal state if isOpen prop is not provided
+  const [internalIsVisible, setInternalIsVisible] = useState<boolean>(false);
+  const isVisible = isOpen !== undefined ? isOpen : internalIsVisible;
+  
   const [selectedOption, setSelectedOption] = useState<DropdownOption | undefined>(
     defaultValue ? options.find(option => option.value === defaultValue) : options[0]
   );
-  const [position, setPosition] = useState<DropdownPosition>({ top: 0, left: 0, width: 0 });
-  const buttonRef = useRef<View>(null);
-  
-  // Measure button position when dropdown is opened
-  const measureButton = () => {
-    if (buttonRef.current) {
-      buttonRef.current.measure((x, y, width, height, pageX, pageY) => {
-        setPosition({
-          top: pageY + height,
-          left: pageX,
-          width: width,
-        });
-        setIsVisible(true);
-      });
-    }
-  };
   
   const toggleDropdown = () => {
-    if (!isVisible) {
-      measureButton();
+    const newState = !isVisible;
+    if (onToggleDropdown) {
+      onToggleDropdown(newState);
     } else {
-      setIsVisible(false);
+      setInternalIsVisible(newState);
     }
   };
 
   const closeDropdown = () => {
-    setIsVisible(false);
+    if (onToggleDropdown) {
+      onToggleDropdown(false);
+    } else {
+      setInternalIsVisible(false);
+    }
   };
 
   const handleSelect = (option: DropdownOption) => {
@@ -77,71 +65,79 @@ const CBDropdown: React.FC<CBDropdownProps> = ({
     closeDropdown();
   };
 
+  // Update internal state when isOpen prop changes
+  useEffect(() => {
+    if (isOpen !== undefined) {
+      setInternalIsVisible(isOpen);
+    }
+  }, [isOpen]);
+
+  // Get screen dimensions for overlay
+  const { width, height } = Dimensions.get('window');
+
   return (
     <View style={[styles.container, containerStyle]}>
-      <View style={styles.dropdownContainer}>
-        <TouchableOpacity 
-          style={styles.dropdownButton} 
-          onPress={toggleDropdown}
-          activeOpacity={0.7}
-          ref={buttonRef}
-        >
-          <Text style={appStyles.content}>{selectedOption?.label}</Text>
-          <Icon
-            name={isVisible ? 'keyboard-arrow-down' : 'keyboard-arrow-right'}
-            type="material"
-            color={colors.primaryTextColor}
-            size={24}
-          />
-        </TouchableOpacity>
+      <TouchableOpacity 
+        style={[
+          styles.dropdownButton, 
+          isVisible ? styles.dropdownButtonOpen : null
+        ]} 
+        onPress={toggleDropdown}
+        activeOpacity={0.7}
+      >
+        <Text style={appStyles.content}>{selectedOption?.label}</Text>
+        <Icon
+          name={isVisible ? 'keyboard-arrow-down' : 'keyboard-arrow-right'}
+          type="material"
+          color={colors.primaryTextColor}
+          size={24}
+        />
+      </TouchableOpacity>
       
-        <Modal
-          visible={isVisible}
-          transparent={true}
-          animationType="none"
-          onRequestClose={closeDropdown}
-        >
+      {isVisible && (
+        <>
+          {/* Full screen transparent overlay to capture taps outside */}
           <TouchableWithoutFeedback onPress={closeDropdown}>
-            <View style={styles.modalOverlay}>
-              <View
-                style={[
-                  styles.dropdown,
-                  {
-                    position: 'absolute',
-                    top: position.top,
-                    left: position.left,
-                    width: position.width,
-                  }
-                ]}
-              >
-                <View style={styles.dropdownContent}>
-                  {options.map((item, index) => (
-                    <TouchableOpacity
-                      key={index}
-                      style={[
-                        styles.option,
-                        selectedOption?.value === item.value && styles.selectedOption,
-                        index === 0 && styles.firstOption,
-                        index === options.length - 1 && styles.lastOption,
-                      ]}
-                      onPress={() => handleSelect(item)}
-                    >
-                      <Text 
-                        style={[
-                          styles.optionText,
-                          selectedOption?.value === item.value && styles.selectedOptionText,
-                        ]}
-                      >
-                        {item.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-            </View>
+            <View 
+              style={[
+                styles.touchableOverlay, 
+                { 
+                  position: 'absolute',
+                  width: width, 
+                  height: height,
+                  top: -100,
+                  left: -20,
+                }
+              ]} 
+            />
           </TouchableWithoutFeedback>
-        </Modal>
-      </View>
+          
+          {/* Dropdown content */}
+          <View style={styles.dropdownContent}>
+            {options.map((item, index) => (
+              <TouchableOpacity
+                key={index}
+                style={[
+                  styles.option,
+                  selectedOption?.value === item.value && styles.selectedOption,
+                  index === 0 && styles.firstOption,
+                  index === options.length - 1 && styles.lastOption,
+                ]}
+                onPress={() => handleSelect(item)}
+              >
+                <Text 
+                  style={[
+                    styles.optionText,
+                    selectedOption?.value === item.value && styles.selectedOptionText,
+                  ]}
+                >
+                  {item.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </>
+      )}
     </View>
   );
 };
@@ -149,10 +145,16 @@ const CBDropdown: React.FC<CBDropdownProps> = ({
 const styles = StyleSheet.create({
   container: {
     position: 'relative',
-    zIndex: 1,
+    zIndex: 999,
   },
-  dropdownContainer: {
-    position: 'relative',
+  touchableOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'transparent',
+    zIndex: 998,
   },
   dropdownButton: {
     flexDirection: 'row',
@@ -163,38 +165,43 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 4,
     borderWidth: 1,
-    borderColor: '#E6E6E6',
+    borderColor: '#E3E3E3',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'transparent',
+  dropdownButtonOpen: {
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    borderTopLeftRadius: 4,
+    borderTopRightRadius: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E3E3E3',
   },
-  dropdown: {
-    backgroundColor: 'transparent',
-    borderRadius: 4,
+  dropdownContent: {
+    position: 'relative',
+    backgroundColor: 'white',
+    borderBottomLeftRadius: 4,
+    borderBottomRightRadius: 4,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    borderWidth: 1,
+    borderColor: '#E3E3E3',
+    borderTopWidth: 0,
+    marginTop: 0,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 6,
-    zIndex: 5001,
-  },
-  dropdownContent: {
-    backgroundColor: 'white',
-    borderRadius: 4,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: '#E6E6E6',
+    zIndex: 1000,
   },
   option: {
     marginHorizontal: 8,
     borderRadius: 3,
-    paddingVertical: 12,
+    paddingVertical: 8,
     paddingHorizontal: 15,
     backgroundColor: colors.grayColor,
     marginVertical: 4,
