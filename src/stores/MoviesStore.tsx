@@ -249,9 +249,9 @@ class MoviesStore {
   }
 
   /**
-   * Search movies by query
+   * Search movies by query with enhanced matching and sorting
    * @param query Search query
-   * @returns Array of movies matching the query
+   * @returns Array of movies matching the query, sorted by release date
    */
   searchMovies = async (query: string): Promise<Movie[]> => {
     // Mark as loading
@@ -280,15 +280,38 @@ class MoviesStore {
         `/search/movie?query=${encodeURIComponent(trimmedQuery)}`
       );
       
-      // Filter results to include partial matches
+      // Enhanced filtering to include:
+      // 1. Partial matches in title/original_title
+      // 2. First letter matching (e.g., "CA" matches "Captain America")
       let filteredResults = response.data.results.filter(movie => {
         const title = movie.title.toLowerCase();
         const originalTitle = movie.original_title?.toLowerCase() || '';
         
         // Check if any search term is included in either title
-        return searchTerms.some(term => 
+        const hasPartialMatch = searchTerms.some(term => 
           title.includes(term) || originalTitle.includes(term)
         );
+        
+        // Check for first letter matches
+        const hasInitialsMatch = (() => {
+          // For a single search term that might be initials (like "CA")
+          if (searchTerms.length === 1 && trimmedQuery.length >= 2) {
+            const term = searchTerms[0];
+            
+            // Get words from titles
+            const titleWords = title.split(' ');
+            const originalTitleWords = originalTitle.split(' ');
+            
+            // Check if consecutive first letters match the search term
+            const titleInitials = titleWords.map(word => word.charAt(0)).join('');
+            const originalTitleInitials = originalTitleWords.map(word => word.charAt(0)).join('');
+            
+            return titleInitials.includes(term) || originalTitleInitials.includes(term);
+          }
+          return false;
+        })();
+        
+        return hasPartialMatch || hasInitialsMatch;
       });
       
       // Sort results by release date (newest first)
@@ -304,12 +327,7 @@ class MoviesStore {
         this.loading['search'] = false;
       });
       
-      if (filteredResults.length > 0) {
-        return filteredResults;
-      } else {
-        console.log('No search results found');
-        return [];
-      }
+      return filteredResults;
     } catch (error) {
       console.error('Error searching movies:', error);
       runInAction(() => {

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, FlatList, ScrollView, View, TouchableOpacity, Keyboard } from 'react-native';
+import { StyleSheet, FlatList, ScrollView, View, TouchableOpacity, Keyboard, TouchableWithoutFeedback } from 'react-native';
 import { observer } from 'mobx-react-lite';
 import { Icon } from '@rneui/themed';
 import { moderateScale } from '@utils/ThemeUtil';
@@ -398,9 +398,14 @@ const HomeScreen: React.FC = observer(() => {
       
       return (
         <CBView style={styles.moviesContainer}>
-          <CBText variant="h4" style={styles.categoryTitle}>
-            Search Results
-          </CBText>
+          <CBView style={styles.searchResultsHeader}>
+            <CBText variant="h4" style={styles.categoryTitle}>
+              Search Results
+            </CBText>
+            <CBText variant="caption" style={styles.searchInfo}>
+              Sorted by newest release date
+            </CBText>
+          </CBView>
           <MovieListWithLoading
             movies={limitedSearchResults}
             loading={moviesStore.loading.search}
@@ -477,20 +482,22 @@ const HomeScreen: React.FC = observer(() => {
       backgroundColor={colors.containerColor}
       statusBarStyle="dark-content"
     >
-      <View style={{ flex: 1 }}>
-        <ScrollView 
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-          scrollEnabled={true}
-          nestedScrollEnabled={true}
-          pointerEvents="box-none"
-        >
-          {renderHeader()}
-          {renderMovieSections()}
-          {renderEmptyState()}
-        </ScrollView>
-      </View>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <View style={{ flex: 1 }}>
+          <ScrollView 
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            scrollEnabled={true}
+            nestedScrollEnabled={true}
+            pointerEvents="box-none"
+          >
+            {renderHeader()}
+            {renderMovieSections()}
+            {renderEmptyState()}
+          </ScrollView>
+        </View>
+      </TouchableWithoutFeedback>
     </ScreenContainer>
   );
 });
@@ -659,6 +666,15 @@ const styles = StyleSheet.create({
   loadMoreButton: {
     marginTop: moderateScale(10),
     marginBottom: moderateScale(24),
+  },
+  searchResultsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: moderateScale(16),
+  },
+  searchInfo: {
+    color: colors.tertiaryTextColor,
   },
 });
 
