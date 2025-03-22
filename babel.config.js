@@ -15,6 +15,7 @@ module.exports = {
           "@services": "./src/services",
           "@assets": "./src/assets",
           "@configs": "./src/configs",
+          "@stores": "./src/stores",
         },
         extensions: ['.ios.js', '.android.js', '.js', '.ts', '.tsx', '.json'],
       },
