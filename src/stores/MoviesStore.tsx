@@ -19,6 +19,33 @@ export interface Movie {
 }
 
 /**
+ * Interface for detailed movie information
+ */
+export interface MovieDetail extends Movie {
+  genres: { id: number; name: string }[];
+  runtime: number;
+  status: string;
+  tagline: string;
+  original_language: string;
+  production_companies: { id: number; name: string; logo_path: string; origin_country: string }[];
+  credits?: {
+    cast: {
+      id: number;
+      name: string;
+      character: string;
+      profile_path: string;
+    }[];
+    crew: {
+      id: number;
+      name: string;
+      job: string;
+      department: string;
+      profile_path: string;
+    }[];
+  };
+}
+
+/**
  * Interface for API response
  */
 interface MovieResponse {
@@ -32,6 +59,26 @@ interface MovieResponse {
  * Types of movie listings
  */
 export type MovieCategory = 'now_playing' | 'upcoming' | 'popular' | 'search';
+
+/**
+ * User profile information
+ */
+export interface UserProfile {
+  id: number;
+  name: string;
+  username: string;
+  avatar?: {
+    gravatar?: {
+      hash: string;
+    };
+    tmdb?: {
+      avatar_path: string;
+    };
+  };
+  iso_639_1?: string;
+  iso_3166_1?: string;
+  include_adult?: boolean;
+}
 
 // Create axios instance with default config
 const movieAPI = axios.create({
@@ -51,20 +98,26 @@ class MoviesStore {
   nowPlayingMovies: Movie[] = [];
   upcomingMovies: Movie[] = [];
   popularMovies: Movie[] = [];
+  watchlistMovies: Movie[] = [];
+  
+  // User profile
+  userProfile: UserProfile | null = null;
   
   // Current states
-  loading: {[key in MovieCategory]: boolean} = {
+  loading: {[key in MovieCategory | 'profile']: boolean} = {
     now_playing: false,
     upcoming: false,
     popular: false,
-    search: false
+    search: false,
+    profile: false
   };
   
-  error: {[key in MovieCategory]: string | null} = {
+  error: {[key in MovieCategory | 'profile']: string | null} = {
     now_playing: null,
     upcoming: null,
     popular: null,
-    search: null
+    search: null,
+    profile: null
   };
   
   // Pagination
@@ -81,6 +134,9 @@ class MoviesStore {
     popular: 0,
     search: 0
   };
+
+  // Currently viewing movie detail
+  currentMovieDetail: MovieDetail | null = null;
 
   constructor() {
     // Make all properties observable
@@ -114,6 +170,60 @@ class MoviesStore {
   }
 
   /**
+   * Fetch popular movies with specific sorting
+   * @param sortBy The sorting parameter to use
+   */
+  async fetchPopularMoviesSorted(sortBy: string) {
+    console.log(`🔄 Starting fetch for popular movies with sort: ${sortBy}`);
+    
+    // Set loading state
+    runInAction(() => {
+      this.loading.popular = true;
+      this.error.popular = null;
+    });
+    
+    try {
+      // Create API request parameters
+      const params = {
+        include_adult: false,
+        include_video: false,
+        language: 'en-US',
+        page: 1,
+        sort_by: sortBy
+      };
+      
+      console.log('📡 API request params:', params);
+      
+      // Make the API call
+      const response = await movieAPI.get('/discover/movie', { params });
+      
+      console.log(`✅ API request successful, got ${response.data.results.length} movies`);
+      
+      // Update the store with the results
+      runInAction(() => {
+        this.popularMovies = response.data.results;
+        this.loading.popular = false;
+        
+        // Sample output
+        if (response.data.results.length > 0) {
+          console.log('Sample results:');
+          response.data.results.slice(0, 3).forEach((movie: Movie, i: number) => {
+            console.log(`  ${i+1}. ${movie.title} (${movie.release_date}) - Rating: ${movie.vote_average}`);
+          });
+        }
+      });
+      
+    } catch (error) {
+      console.error('⚠️ Error fetching sorted popular movies:', error);
+      
+      runInAction(() => {
+        this.loading.popular = false;
+        this.error.popular = 'Failed to fetch sorted movies';
+      });
+    }
+  }
+
+  /**
    * Fetch popular movies
    * @param forceRefresh Force refresh data even if already loaded
    */
@@ -123,7 +233,8 @@ class MoviesStore {
       return;
     }
     
-    await this.fetchMoviesByCategory('popular');
+    // Use the default sort parameter: popularity.desc
+    await this.fetchPopularMoviesSorted('popularity.desc');
   }
 
   /**
@@ -166,15 +277,6 @@ class MoviesStore {
             with_release_type: '2|3', // 2=Theatrical, 3=Digital
             'release_date.gte': pastDateStr,
             'release_date.lte': currentDateStr
-          };
-          break;
-          
-        case 'popular':
-          // Using discover endpoint with popularity sorting for popular movies
-          endpoint = '/discover/movie';
-          params = {
-            ...params,
-            sort_by: 'popularity.desc'
           };
           break;
           
@@ -222,9 +324,6 @@ class MoviesStore {
             break;
           case 'upcoming':
             this.upcomingMovies = response.data.results;
-            break;
-          case 'popular':
-            this.popularMovies = response.data.results;
             break;
         }
         
@@ -392,6 +491,316 @@ class MoviesStore {
         this.totalPages[category] = 0;
       });
     });
+  }
+
+  /**
+   * Fetch movie details by ID
+   * @param movieId The ID of the movie to fetch details for
+   * @returns The movie detail object
+   */
+  async getMovieDetails(movieId: number): Promise<MovieDetail | null> {
+    // Mark as loading
+    runInAction(() => {
+      this.loading['search'] = true; // Reuse search loading state temporarily
+      this.error['search'] = null;
+    });
+    
+    try {
+      console.log(`Fetching details for movie ID: ${movieId}`);
+      
+      // Make the API request with append_to_response to fetch credits in the same request
+      const response = await movieAPI.get<MovieDetail>(`/movie/${movieId}?language=en-US&append_to_response=credits`);
+      
+      // Update state with the fetched movie detail
+      runInAction(() => {
+        this.currentMovieDetail = response.data;
+        this.loading['search'] = false;
+        console.log(`✅ Movie details loaded successfully for: ${response.data.title}`);
+      });
+      
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching movie details for ID ${movieId}:`, error);
+      
+      runInAction(() => {
+        this.loading['search'] = false;
+        this.error['search'] = axios.isAxiosError(error) 
+          ? error.message || `Error ${error.response?.status}` 
+          : 'Unknown error';
+      });
+      
+      return null;
+    }
+  }
+
+  /**
+   * Check if a movie is in the watchlist
+   * @param movieId The ID of the movie to check
+   * @returns true if the movie is in the watchlist, false otherwise
+   */
+  isInWatchlist(movieId: number): boolean {
+    return this.watchlistMovies.some(movie => movie.id === movieId);
+  }
+
+  /**
+   * Fetch user's watchlist from TMDB API
+   * @param page Page number to fetch
+   * @param sortBy Sort parameter (e.g., 'created_at.asc', 'created_at.desc', 'title.asc', etc.)
+   * @returns Array of movies in the user's watchlist
+   */
+  async fetchWatchlist(page = 1, sortBy = 'created_at.asc'): Promise<Movie[]> {
+    // Mark as loading
+    runInAction(() => {
+      this.loading.search = true; // Reuse search loading state
+      this.error.search = null;
+    });
+    
+    try {
+      console.log(`Fetching watchlist for account ID: 21896145, sort by: ${sortBy}, page: ${page}`);
+      
+      // Make the API request exactly as in the curl command
+      const url = `/account/21896145/watchlist/movies?language=en-US&page=${page}&sort_by=${sortBy}`;
+      console.log('Requesting:', url);
+      
+      const response = await movieAPI.get<MovieResponse>(url);
+      
+      // Update the watchlist in the store
+      runInAction(() => {
+        this.watchlistMovies = response.data.results;
+        this.loading.search = false;
+        console.log(`✅ Watchlist loaded successfully with ${response.data.results.length} movies`);
+        
+        // Log some sample watchlist items
+        if (response.data.results.length > 0) {
+          console.log('Sample watchlist items:');
+          response.data.results.slice(0, 3).forEach((movie, index) => {
+            console.log(`  ${index + 1}. ${movie.title} (${movie.release_date?.split('-')[0] || 'N/A'}) - Rating: ${movie.vote_average}`);
+          });
+        }
+      });
+      
+      return response.data.results;
+    } catch (error) {
+      console.error('Error fetching watchlist:', error);
+      
+      runInAction(() => {
+        this.loading.search = false;
+        this.error.search = axios.isAxiosError(error) 
+          ? error.message || `Error ${error.response?.status}` 
+          : 'Unknown error';
+        
+        // If API call fails, use the local watchlist as fallback
+        console.log('Using local watchlist as fallback');
+      });
+      
+      return this.watchlistMovies;
+    }
+  }
+
+  /**
+   * Load watchlist from API with specified sorting
+   * @param sortBy Sort parameter for the API request (default: created_at.asc)
+   */
+  async loadWatchlist(sortBy = 'created_at.asc'): Promise<void> {
+    console.log(`Loading watchlist from API with sort: ${sortBy}`);
+    
+    // Map of sort values to human-readable descriptions for logging
+    const sortDescriptions: Record<string, string> = {
+      'vote_average.desc': 'highest rated first',
+      'vote_average.asc': 'lowest rated first',
+      'created_at.asc': 'oldest additions first',
+      'created_at.desc': 'newest additions first',
+      'title.asc': 'alphabetical A-Z',
+      'title.desc': 'alphabetical Z-A',
+      'release_date.desc': 'newest releases first',
+      'release_date.asc': 'oldest releases first'
+    };
+    
+    console.log(`Sorting watchlist by: ${sortDescriptions[sortBy] || sortBy}`);
+    await this.fetchWatchlist(1, sortBy);
+  }
+
+  /**
+   * Fetch user account details
+   * @returns The user profile
+   */
+  async getUserProfile(): Promise<UserProfile | null> {
+    // Mark as loading
+    runInAction(() => {
+      this.loading.profile = true;
+      this.error.profile = null;
+    });
+    
+    try {
+      console.log('Fetching user profile');
+      
+      // Make the API request with specific account ID
+      const response = await movieAPI.get<UserProfile>('/account/21896145');
+      
+      // Update state with the fetched profile
+      runInAction(() => {
+        this.userProfile = response.data;
+        this.loading.profile = false;
+        console.log('✅ User profile loaded successfully');
+      });
+      
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+      
+      runInAction(() => {
+        this.loading.profile = false;
+        this.error.profile = axios.isAxiosError(error) 
+          ? error.message || `Error ${error.response?.status}` 
+          : 'Unknown error';
+      });
+      
+      return null;
+    }
+  }
+
+  /**
+   * Get the user's avatar URL, either from Gravatar or TMDB
+   * @returns The URL of the user's avatar or a placeholder
+   */
+  getUserAvatarUrl(): string {
+    if (!this.userProfile || !this.userProfile.avatar) {
+      return 'https://via.placeholder.com/150?text=User';
+    }
+    
+    // Use Gravatar if available
+    if (this.userProfile.avatar.gravatar?.hash) {
+      return `https://secure.gravatar.com/avatar/${this.userProfile.avatar.gravatar.hash}?s=150`;
+    }
+    
+    // Use TMDB avatar if available
+    if (this.userProfile.avatar.tmdb?.avatar_path) {
+      const path = this.userProfile.avatar.tmdb.avatar_path;
+      return path.startsWith('/') 
+        ? `${CBConfigs.tmdb.imageBaseUrl}/w150_and_h150_face${path}`
+        : path;
+    }
+    
+    // Use placeholder as fallback
+    return 'https://via.placeholder.com/150?text=User';
+  }
+
+  /**
+   * Get user's first initial for avatar fallback
+   * @returns The first letter of the user's name or username
+   */
+  getUserInitial(): string {
+    if (!this.userProfile) return '?';
+    
+    if (this.userProfile.name && this.userProfile.name.length > 0) {
+      return this.userProfile.name.charAt(0).toUpperCase();
+    }
+    
+    if (this.userProfile.username && this.userProfile.username.length > 0) {
+      return this.userProfile.username.charAt(0).toUpperCase();
+    }
+    
+    return '?';
+  }
+
+  /**
+   * Add a movie to the watchlist via TMDB API
+   * @param movie The movie to add to the watchlist
+   * @returns Promise resolving to true if successful
+   */
+  async addToWatchlist(movie: Movie | MovieDetail): Promise<boolean> {
+    // Check if movie is already in watchlist
+    if (this.isInWatchlist(movie.id)) {
+      console.log(`Movie "${movie.title}" is already in watchlist`);
+      return false;
+    }
+
+    console.log(`Adding movie: ${movie.title} (ID: ${movie.id}) to watchlist`);
+    
+    try {
+      // Call the TMDB API to add to watchlist
+      const response = await movieAPI.post('/account/21896145/watchlist', {
+        media_type: 'movie',
+        media_id: movie.id,
+        watchlist: true
+      });
+      
+      console.log('API watchlist add response:', response.data);
+      
+      // If API call is successful, update local state
+      if (response.data?.success) {
+        runInAction(() => {
+          this.watchlistMovies.push(movie);
+          console.log(`Successfully added "${movie.title}" to watchlist`);
+        });
+        return true;
+      } else {
+        console.error('API reported failure to add to watchlist');
+        return false;
+      }
+    } catch (error) {
+      console.error('Error adding to watchlist via API:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Remove a movie from the watchlist via TMDB API
+   * @param movieId The ID of the movie to remove from the watchlist
+   * @returns Promise resolving to true if successful
+   */
+  async removeFromWatchlist(movieId: number): Promise<boolean> {
+    // Find the movie in the local watchlist
+    const movie = this.watchlistMovies.find(m => m.id === movieId);
+    if (!movie) {
+      console.log(`Movie with ID: ${movieId} not found in watchlist`);
+      return false;
+    }
+    
+    console.log(`Removing movie: ${movie.title} (ID: ${movieId}) from watchlist`);
+    
+    try {
+      // Call the TMDB API to remove from watchlist
+      const response = await movieAPI.post('/account/21896145/watchlist', {
+        media_type: 'movie',
+        media_id: movieId,
+        watchlist: false
+      });
+      
+      console.log('API watchlist remove response:', response.data);
+      
+      // If API call is successful, update local state
+      if (response.data?.success) {
+        runInAction(() => {
+          this.watchlistMovies = this.watchlistMovies.filter(movie => movie.id !== movieId);
+          console.log(`Successfully removed movie ID: ${movieId} from watchlist`);
+        });
+        return true;
+      } else {
+        console.error('API reported failure to remove from watchlist');
+        return false;
+      }
+    } catch (error) {
+      console.error('Error removing from watchlist via API:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Toggle movie in watchlist - add if not present, remove if present
+   * @param movie The movie to toggle in the watchlist
+   * @returns Promise resolving to true if added to watchlist, false if removed
+   */
+  async toggleWatchlist(movie: Movie | MovieDetail): Promise<boolean> {
+    console.log(`Toggling watchlist status for movie: ${movie.title} (ID: ${movie.id})`);
+    
+    if (this.isInWatchlist(movie.id)) {
+      const removed = await this.removeFromWatchlist(movie.id);
+      return !removed; // Return false if successfully removed
+    } else {
+      const added = await this.addToWatchlist(movie);
+      return added; // Return true if successfully added
+    }
   }
 }
 

@@ -14,6 +14,9 @@ export interface Genre {
   name: string;
 }
 
+/**
+ * Navigation types for the app
+ */
 export type RootStackParamList = {
   Root: undefined;
   Home: undefined;

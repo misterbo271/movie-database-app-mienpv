@@ -48,6 +48,14 @@ export const getCurrentYear = (): number => {
 };
 
 /**
+ * Get the current month and year as a formatted string
+ * @returns Current month and year (e.g., "March 2023")
+ */
+export const getCurrentMonthYear = (): string => {
+  return moment().format('MMMM YYYY');
+};
+
+/**
  * Get the date N days ago
  * @param days Number of days to go back
  * @returns Formatted date string (YYYY-MM-DD)
@@ -135,6 +143,7 @@ export default {
   getCurrentDay,
   getCurrentMonth,
   getCurrentYear,
+  getCurrentMonthYear,
   getDateDaysAgo,
   getDateDaysFromNow,
   getDateMonthsFromNow,

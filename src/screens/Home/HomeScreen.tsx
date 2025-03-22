@@ -3,6 +3,9 @@ import { StyleSheet, FlatList, ScrollView, View, TouchableOpacity, Keyboard, Tou
 import { observer } from 'mobx-react-lite';
 import { Icon } from '@rneui/themed';
 import { moderateScale } from '@utils/ThemeUtil';
+import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
+import { RootStackParamList } from '../../../src/types';
 
 // Hooks
 import { useMoviesStore } from '@hooks/useStores';
@@ -30,9 +33,9 @@ import { Movie, MovieCategory } from '@stores/MoviesStore';
  * Sort options for movie lists
  */
 const SORT_OPTIONS: DropdownOption[] = [
-  { label: 'By alphabetical order', value: 'title.asc' },
+  { label: 'By alphabetical order', value: 'title.desc' },
   { label: 'By rating', value: 'vote_average.desc' },
-  { label: 'By release date', value: 'release_date.desc' },
+  { label: 'By release date', value: 'primary_release_date.desc' },
 ];
 
 /**
@@ -187,7 +190,10 @@ const HorizontalMovieList: React.FC<{
  * Uses MobX for state management
  */
 const HomeScreen: React.FC = observer(() => {
-  // Access to movies store
+  // Navigation
+  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
+  
+  // Stores
   const moviesStore = useMoviesStore();
   
   // Local UI state
@@ -255,10 +261,26 @@ const HomeScreen: React.FC = observer(() => {
    * @param option - The selected sort option
    */
   const handleSortSelect = (option: DropdownOption) => {
-    // Hide keyboard if showing
-    Keyboard.dismiss();
+    console.log(`Sort option selected: ${option.label} (${option.value})`);
     
+    // Save the selected sort option
     setSelectedSort(option);
+    
+    // If we're on the Popular category, apply the sort
+    if (selectedCategory.value === 'popular') {
+      console.log(`Applying sort ${option.value} to Popular movies...`);
+      
+      // Reset visible movies count
+      setVisibleMovies(5);
+      
+      // Fetch with the new sort option
+      moviesStore.fetchPopularMoviesSorted(option.value);
+      
+      // Close the dropdown
+      setIsSortDropdownOpen(false);
+    } else {
+      console.log(`Sort not applied - current category is ${selectedCategory.value}, not popular`);
+    }
   };
 
   /**
@@ -287,8 +309,8 @@ const HomeScreen: React.FC = observer(() => {
    */
   const handleMoviePress = (movie: Movie) => {
     console.log('Movie pressed:', movie.title);
-    // In a real app, this would navigate to movie details
-    // navigation.navigate('MovieDetails', { movieId: movie.id });
+    // Navigate to movie details
+    navigation.navigate('MovieDetail', { movieId: movie.id });
   };
 
   /**
@@ -446,6 +468,17 @@ const HomeScreen: React.FC = observer(() => {
     
     return (
       <CBView style={styles.moviesContainer}>
+        {/* Show sort information for Popular category */}
+        {selectedCategory.value === 'popular' && (
+          <CBView style={styles.categoryInfoHeader}>
+            <CBText variant="h4" style={styles.categoryTitle}>
+              {selectedCategory.label} Movies
+            </CBText>
+            <CBText variant="caption" style={styles.sortInfo}>
+              Sorted by {selectedSort.label.toLowerCase()}
+            </CBText>
+          </CBView>
+        )}
         
         {/* Movie list in grid layout */}
         <MovieListWithLoading
@@ -687,6 +720,15 @@ const styles = StyleSheet.create({
     marginBottom: moderateScale(16),
   },
   searchInfo: {
+    color: colors.tertiaryTextColor,
+  },
+  categoryInfoHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: moderateScale(16),
+  },
+  sortInfo: {
     color: colors.tertiaryTextColor,
   },
 });
