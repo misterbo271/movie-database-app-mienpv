@@ -111,26 +111,35 @@ const MovieDetailScreen: React.FC = observer(() => {
    * Handle add to watchlist button press
    */
   const handleAddToWatchlist = async () => {
-    if (!movie) return;
-
+    if (!movie) {
+      console.error('Cannot add to watchlist: Movie data is undefined');
+      return;
+    }
+    
     // Reset states
     setIsAddingToWatchlist(true);
     setActionSuccess(false);
     setWatchlistError(null);
-
+    
+    console.log(`Attempting to ${isInWatchlist() ? 'remove from' : 'add to'} watchlist: ${movie.title} (ID: ${movie.id})`);
+    
     try {
       // Call the async toggleWatchlist method
       const result = await moviesStore.toggleWatchlist(movie);
-
+      
       // Show success state briefly
       setActionSuccess(true);
-
+      
       // Log the result
-      console.log(result
-        ? `Added "${movie.title}" to watchlist`
+      console.log('Watchlist toggle result:', result);
+      console.log(result 
+        ? `Added "${movie.title}" to watchlist` 
         : `Removed "${movie.title}" from watchlist`
       );
-
+      
+      // Check if the movie is now in the watchlist
+      console.log('Is movie in watchlist after operation?', moviesStore.isInWatchlist(movie.id));
+      
       // Clear success state after a delay
       setTimeout(() => {
         setActionSuccess(false);
@@ -138,7 +147,7 @@ const MovieDetailScreen: React.FC = observer(() => {
     } catch (error) {
       console.error('Error toggling watchlist status:', error);
       setWatchlistError('Failed to update watchlist. Please try again.');
-
+      
       // Clear error after a delay
       setTimeout(() => {
         setWatchlistError(null);
@@ -239,7 +248,7 @@ const MovieDetailScreen: React.FC = observer(() => {
                 {/* Rating Badge */}
                 <CBView style={styles.ratingBadge}>
                   <CBText variant="body" style={styles.ratingText}>
-                    PG13
+                    {!!movie?.adult ? 'R21' : 'PG13'}
                   </CBText>
                 </CBView>
 
@@ -282,112 +291,115 @@ const MovieDetailScreen: React.FC = observer(() => {
               </CBView>
             </CBView>
             {/* Movie Info Section */}
-
+            <CBView style={styles.detailMoviveSection}>
             {/* User Score Section */}
-            <CBView style={styles.userScoreSection}>
-              <CBView style={styles.scoreCircle}>
-                <CBText variant="h3" style={styles.scoreText}>
-                  {Math.round(movie.vote_average * 10)}
-                </CBText>
-              </CBView>
-              <CBText variant="h4" style={styles.userScoreLabel}>
-                User Score
-              </CBText>
-            </CBView>
-
-            {/* Credits Section */}
-            <CBView style={styles.creditsSection}>
-              {movie.credits?.crew?.some(person => person.job === 'Director') && (
-                <CBView style={styles.creditItem}>
-                  <CBText variant="h5" style={styles.creditName}>
-                    {movie.credits.crew
-                      .filter(person => person.job === 'Director')
-                      .map(director => director.name)
-                      .join(', ')}
-                  </CBText>
-                  <CBText variant="body" style={styles.creditRole}>
-                    Director, Writer
+            <CBView style={{flexDirection: 'row'}}>
+              <CBView style={styles.userScoreSection}>
+                  <CBView style={styles.scoreCircle}>
+                    <CBText variant="h3" style={styles.scoreText}>
+                      {Math.round(movie.vote_average * 10)}<CBText variant="caption" style={styles.percentText}>%</CBText>
+                    </CBText>
+                  </CBView>
+                  <CBText variant="h4" style={styles.userScoreLabel}>
+                    User Score
                   </CBText>
                 </CBView>
-              )}
 
-              {movie.credits?.crew?.some(person =>
-                person.department === 'Writing' || person.job === 'Screenplay' || person.job === 'Story'
-              ) && (
-                <CBView style={styles.creditItem}>
-                  <CBText variant="h5" style={styles.creditName}>
-                    {movie.credits.crew
-                      .filter(person =>
-                        person.department === 'Writing' || person.job === 'Screenplay' || person.job === 'Story'
-                      )
-                      .slice(0, 2)
-                      .map(writer => writer.name)
-                      .join(', ')}
-                  </CBText>
-                  <CBText variant="body" style={styles.creditRole}>
-                    Writer
-                  </CBText>
+                {/* Credits Section */}
+                <CBView style={styles.creditsSection}>
+                  {movie.credits?.crew?.some(person => person.job === 'Director') && (
+                    <CBView style={styles.creditItem}>
+                      <CBText variant="h5" style={styles.creditName}>
+                        {movie.credits.crew
+                          .filter(person => person.job === 'Director')
+                          .map(director => director.name)
+                          .join(', ')}
+                      </CBText>
+                      <CBText variant="body" style={styles.creditRole}>
+                        Director, Writer
+                      </CBText>
+                    </CBView>
+                  )}
+
+                  {movie.credits?.crew?.some(person =>
+                    person.department === 'Writing' || person.job === 'Screenplay' || person.job === 'Story'
+                  ) && (
+                    <CBView style={styles.creditItem}>
+                      <CBText variant="h5" style={styles.creditName}>
+                        {movie.credits.crew
+                          .filter(person =>
+                            person.department === 'Writing' || person.job === 'Screenplay' || person.job === 'Story'
+                          )
+                          .slice(0, 2)
+                          .map(writer => writer.name)
+                          .join(', ')}
+                      </CBText>
+                      <CBText variant="body" style={styles.creditRole}>
+                        Writer
+                      </CBText>
+                    </CBView>
+                  )}
                 </CBView>
-              )}
             </CBView>
 
-            {/* Tagline */}
-            {movie.tagline && (
+              {/* Tagline */}
               <CBView style={styles.taglineContainer}>
-                <CBText variant="caption" style={styles.taglineText}>
-                  "{movie.tagline}"
+                <CBText style={styles.taglineText}>
+                  {movie?.tagline}
                 </CBText>
               </CBView>
-            )}
 
-            {/* Overview Section */}
-            <CBView style={styles.overviewSection}>
-              <CBText variant="h4" style={styles.sectionTitle}>
-                Overview
-              </CBText>
-              <CBText variant="body" style={styles.overviewText}>
-                {movie.overview || 'No overview available.'}
-              </CBText>
-            </CBView>
-
-            {/* Add to Watchlist Button */}
-            <CBView style={styles.watchlistButtonContainer}>
-              <CBButton
-                title={
-                  actionSuccess
-                    ? "Success!"
-                    : isInWatchlist()
-                      ? "Remove From Watchlist"
-                      : "Add To Watchlist"
-                }
-                variant={actionSuccess ? "secondary" : "primary"}
-                onPress={handleAddToWatchlist}
-                style={styles.watchlistButton}
-                loading={isAddingToWatchlist}
-                leftIcon={
-                  !isAddingToWatchlist && (
-                    <Icon
-                      name={actionSuccess
-                        ? "check-circle"
-                        : isInWatchlist()
-                          ? "bookmark"
-                          : "bookmark-outline"
-                      }
-                      type="material-community"
-                      color={colors.whiteColor}
-                      size={20}
-                      style={styles.buttonIcon}
-                    />
-                  )
-                }
-              />
-
-              {watchlistError && (
-                <CBText variant="caption" style={styles.errorMessage}>
-                  {watchlistError}
+              {/* Overview Section */}
+              <CBView style={styles.overviewSection}>
+                <CBText variant="h2" style={styles.sectionTitle}>
+                  Overview
                 </CBText>
-              )}
+                <CBText style={styles.overviewText}>
+                  {movie?.overview}
+                </CBText>
+              </CBView>
+
+              {/* Add to Watchlist Button */}
+              <CBView style={styles.watchlistButtonContainer}>
+                <CBButton
+                  title={
+                    isAddingToWatchlist 
+                      ? "Processing..." 
+                      : actionSuccess 
+                        ? "Success!" 
+                        : isInWatchlist() 
+                          ? "Remove From Watchlist" 
+                          : "Add To Watchlist"
+                  }
+                  titleColor={colors.whiteColor}
+                  onPress={handleAddToWatchlist}
+                  style={styles.watchlistButton}
+                  loading={isAddingToWatchlist}
+                  leftIcon={
+                    !isAddingToWatchlist && (
+                      <Icon
+                        name={actionSuccess 
+                          ? "check-circle" 
+                          : isInWatchlist() 
+                            ? "bookmark" 
+                            : "bookmark-outline"
+                        }
+                        type="material-community"
+                        color={colors.whiteColor}
+                        size={20}
+                        style={styles.buttonIcon}
+                      />
+                    )
+                  }
+                />
+                {watchlistError && (
+                  <CBText variant="caption" style={styles.errorMessage}>
+                    {watchlistError}
+                  </CBText>
+                )}
+              </CBView>
             </CBView>
+
           </ScreenContainer>
           </>
         )}
@@ -423,7 +435,7 @@ const styles = StyleSheet.create({
   contentContainer: {
     backgroundColor: '#4C95C3',
     flexDirection: 'row',
-    paddingBottom: moderateScale(40),
+    paddingBottom: moderateScale(30),
   },
   headerContainer: {
     width: '100%',
@@ -483,73 +495,90 @@ const styles = StyleSheet.create({
     color: colors.whiteColor,
     fontSize: moderateScale(16),
   },
+  detailMoviveSection: {
+    backgroundColor: '#00B4E4',
+    paddingTop: moderateScale(0),
+  },
   userScoreSection: {
-    backgroundColor: '#5BA0CC',
-    padding: moderateScale(16),
-    flexDirection: 'row',
-    alignItems: 'center',
+    padding: moderateScale(24),
+    alignItems: 'flex-start',
   },
   scoreCircle: {
     width: moderateScale(60),
     height: moderateScale(60),
     borderRadius: moderateScale(30),
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: 'rgba(0,0,0,0.1)',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: moderateScale(16),
+    borderWidth: moderateScale(3),
+    borderColor: '#4AFF8A',
   },
   scoreText: {
     color: colors.whiteColor,
     fontWeight: 'bold',
+    fontSize: moderateScale(20),
+  },
+  percentText: {
+    color: colors.whiteColor,
+    fontSize: moderateScale(12),
+    fontWeight: 'normal',
   },
   userScoreLabel: {
+    marginTop: moderateScale(10),
     color: colors.whiteColor,
     fontWeight: 'bold',
+    fontSize: moderateScale(22),
   },
   creditsSection: {
+    flex: 1,
     padding: moderateScale(20),
-    backgroundColor: colors.whiteColor,
   },
   creditItem: {
     marginBottom: moderateScale(15),
   },
   creditName: {
     fontWeight: 'bold',
-    color: colors.primaryTextColor,
+    fontSize: moderateScale(18),
+    color: colors.whiteColor,
   },
   creditRole: {
-    color: colors.secondaryTextColor,
+    color: colors.whiteColor,
+    fontSize: moderateScale(16),
   },
   taglineContainer: {
     paddingHorizontal: moderateScale(20),
-    marginBottom: moderateScale(10),
-    backgroundColor: colors.whiteColor,
   },
   taglineText: {
     fontStyle: 'italic',
-    color: colors.secondaryTextColor,
+    color: colors.whiteColor,
+    fontSize: moderateScale(20),
   },
   overviewSection: {
     padding: moderateScale(20),
-    backgroundColor: colors.whiteColor,
   },
   sectionTitle: {
     fontWeight: 'bold',
     marginBottom: moderateScale(10),
-    color: colors.primaryTextColor,
+    color: colors.whiteColor,
   },
   overviewText: {
+    fontWeight: 'regular',
     lineHeight: moderateScale(24),
-    color: colors.secondaryTextColor,
+    color: colors.whiteColor,
+    fontSize: moderateScale(18),
   },
   watchlistButtonContainer: {
     padding: moderateScale(20),
     paddingTop: 0,
-    backgroundColor: colors.whiteColor,
+    backgroundColor: '#00B4E4',
   },
   watchlistButton: {
-    width: '100%',
-    borderRadius: moderateScale(30),
+    width: '60%',
+    height: moderateScale(46),
+    borderRadius: moderateScale(8),
+    borderWidth: 1,
+    borderColor: colors.whiteColor,
   },
   buttonIcon: {
     marginRight: moderateScale(8),
@@ -575,9 +604,10 @@ const styles = StyleSheet.create({
     minWidth: moderateScale(120),
   },
   errorMessage: {
-    color: colors.errorTextColor,
+    color: colors.whiteColor,
     marginTop: moderateScale(8),
-    fontSize: moderateScale(12),
+    textAlign: 'center',
+    fontSize: moderateScale(14),
   },
 });
 

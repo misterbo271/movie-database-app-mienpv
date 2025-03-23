@@ -27,6 +27,7 @@ export interface MovieDetail extends Movie {
   status: string;
   tagline: string;
   original_language: string;
+  adult: boolean;
   production_companies: { id: number; name: string; logo_path: string; origin_country: string }[];
   credits?: {
     cast: {
@@ -730,102 +731,66 @@ class MoviesStore {
   }
 
   /**
-   * Add a movie to the watchlist via TMDB API
-   * @param movie The movie to add to the watchlist
-   * @returns Promise resolving to true if successful
-   */
-  async addToWatchlist(movie: Movie | MovieDetail): Promise<boolean> {
-    // Check if movie is already in watchlist
-    if (this.isInWatchlist(movie.id)) {
-      console.log(`Movie "${movie.title}" is already in watchlist`);
-      return false;
-    }
-
-    console.log(`Adding movie: ${movie.title} (ID: ${movie.id}) to watchlist`);
-    
-    try {
-      // Call the TMDB API to add to watchlist
-      const response = await movieAPI.post('/account/21896145/watchlist', {
-        media_type: 'movie',
-        media_id: movie.id,
-        watchlist: true
-      });
-      
-      console.log('API watchlist add response:', response.data);
-      
-      // If API call is successful, update local state
-      if (response.data?.success) {
-        runInAction(() => {
-          this.watchlistMovies.push(movie);
-          console.log(`Successfully added "${movie.title}" to watchlist`);
-        });
-        return true;
-      } else {
-        console.error('API reported failure to add to watchlist');
-        return false;
-      }
-    } catch (error) {
-      console.error('Error adding to watchlist via API:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Remove a movie from the watchlist via TMDB API
-   * @param movieId The ID of the movie to remove from the watchlist
-   * @returns Promise resolving to true if successful
-   */
-  async removeFromWatchlist(movieId: number): Promise<boolean> {
-    // Find the movie in the local watchlist
-    const movie = this.watchlistMovies.find(m => m.id === movieId);
-    if (!movie) {
-      console.log(`Movie with ID: ${movieId} not found in watchlist`);
-      return false;
-    }
-    
-    console.log(`Removing movie: ${movie.title} (ID: ${movieId}) from watchlist`);
-    
-    try {
-      // Call the TMDB API to remove from watchlist
-      const response = await movieAPI.post('/account/21896145/watchlist', {
-        media_type: 'movie',
-        media_id: movieId,
-        watchlist: false
-      });
-      
-      console.log('API watchlist remove response:', response.data);
-      
-      // If API call is successful, update local state
-      if (response.data?.success) {
-        runInAction(() => {
-          this.watchlistMovies = this.watchlistMovies.filter(movie => movie.id !== movieId);
-          console.log(`Successfully removed movie ID: ${movieId} from watchlist`);
-        });
-        return true;
-      } else {
-        console.error('API reported failure to remove from watchlist');
-        return false;
-      }
-    } catch (error) {
-      console.error('Error removing from watchlist via API:', error);
-      return false;
-    }
-  }
-
-  /**
    * Toggle movie in watchlist - add if not present, remove if present
    * @param movie The movie to toggle in the watchlist
    * @returns Promise resolving to true if added to watchlist, false if removed
    */
   async toggleWatchlist(movie: Movie | MovieDetail): Promise<boolean> {
     console.log(`Toggling watchlist status for movie: ${movie.title} (ID: ${movie.id})`);
+    console.log('Current watchlist status:', this.isInWatchlist(movie.id) ? 'In watchlist' : 'Not in watchlist');
     
-    if (this.isInWatchlist(movie.id)) {
-      const removed = await this.removeFromWatchlist(movie.id);
-      return !removed; // Return false if successfully removed
-    } else {
-      const added = await this.addToWatchlist(movie);
-      return added; // Return true if successfully added
+    try {
+      if (this.isInWatchlist(movie.id)) {
+        console.log(`Removing movie: ${movie.title} (ID: ${movie.id}) from watchlist`);
+        
+        // Call the TMDB API to remove from watchlist
+        const response = await movieAPI.post('/account/21896145/watchlist', {
+          media_type: 'movie',
+          media_id: movie.id,
+          watchlist: false
+        });
+        
+        console.log('API watchlist remove response:', response.data);
+        
+        // If API call is successful, update local state
+        if (response.data?.success) {
+          runInAction(() => {
+            this.watchlistMovies = this.watchlistMovies.filter(m => m.id !== movie.id);
+            console.log(`Successfully removed movie ID: ${movie.id} from watchlist`);
+          });
+          return false; // Removed from watchlist
+        }
+      } else {
+        console.log(`Adding movie: ${movie.title} (ID: ${movie.id}) to watchlist`);
+        
+        // Call the TMDB API to add to watchlist
+        const response = await movieAPI.post('/account/21896145/watchlist', {
+          media_type: 'movie',
+          media_id: movie.id,
+          watchlist: true
+        });
+        
+        console.log('API watchlist add response:', response.data);
+        
+        // If API call is successful, update local state
+        if (response.data?.success) {
+          runInAction(() => {
+            // Add movie to watchlist if not already in it
+            if (!this.isInWatchlist(movie.id)) {
+              this.watchlistMovies.push(movie);
+              console.log(`Successfully added "${movie.title}" to watchlist`);
+            }
+          });
+          return true; // Added to watchlist
+        }
+      }
+      
+      console.error('API reported failure for watchlist operation');
+      return this.isInWatchlist(movie.id); // Return current status
+      
+    } catch (error) {
+      console.error('Error in toggleWatchlist operation:', error);
+      throw error; // Let the caller handle the error
     }
   }
 }

@@ -103,13 +103,13 @@ const CBHeader: React.FC<CBHeaderProps> = ({
       <CBView style={styles.titleContainer}>
         <CBText variant="h3" style={[styles.title, { color: textColor }]}>
           {title}
-        </CBText>
-
-        {subtitle && (
+          {subtitle && (
           <CBText variant="h4" style={[styles.subtitle, { color: textColor }]}>
-            {subtitle}
+            {` ${subtitle}`}
           </CBText>
         )}
+        </CBText>
+
       </CBView>
     </View>
   );
@@ -128,24 +128,21 @@ const styles = StyleSheet.create({
     height: moderateScale(50),
   },
   detailHeader: {
+    flexDirection: 'row',
     paddingVertical: moderateScale(24),
     paddingBottom: moderateScale(30),
-    paddingHorizontal: moderateScale(20),
+    alignItems: 'flex-start',
+    justifyContent: 'flex-start',
     width: '100%',
     position: 'relative',
   },
   backButton: {
-    position: 'absolute',
-    top: moderateScale(24),
-    left: moderateScale(8),
-    zIndex: 100,
     width: moderateScale(36),
     height: moderateScale(36),
     borderRadius: moderateScale(18),
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   titleContainer: {
+    flex: 9,
     justifyContent: 'center',
     flexDirection: 'row',
     alignItems: 'center',

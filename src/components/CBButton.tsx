@@ -39,6 +39,10 @@ interface CBButtonProps extends TouchableOpacityProps {
    */
   title: string;
   /**
+   * Button title color
+   */
+  titleColor?: string;
+  /**
    * Button variant (determines appearance)
    */
   variant?: ButtonVariant;
@@ -91,6 +95,7 @@ interface CBButtonProps extends TouchableOpacityProps {
 const CBButton: React.FC<CBButtonProps> = (props) => {
   const { 
     title, 
+    titleColor,
     variant = 'primary', 
     size = 'medium', 
     loading = false, 
@@ -135,7 +140,7 @@ const CBButton: React.FC<CBButtonProps> = (props) => {
           {leftIcon}
           <CBText 
             variant={textSize} 
-            style={[styles.text, { color: textColor }]}
+            style={[styles.text, { color: titleColor || textColor }]}
           >
             {title}
           </CBText>
