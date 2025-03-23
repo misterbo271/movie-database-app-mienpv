@@ -12,12 +12,6 @@ A React Native mobile application for browsing movies using The Movie Database (
   <img src="./screenshots/screen_5.png" width="240" alt="User Profile" />
 </div>
 
-## App Demo
-
-<div align="center">
-  <img src="./screenshots/app_demo.gif" width="300" alt="App Demo" />
-</div>
-
 ## Features
 
 - Browse popular, top rated, upcoming and now playing movies

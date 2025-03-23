@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { StyleSheet, ScrollView, View, TouchableOpacity, StatusBar } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { StyleSheet, ScrollView, StatusBar } from 'react-native';
 import { observer } from 'mobx-react-lite';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -7,7 +7,7 @@ import { Icon } from '@rneui/themed';
 import { moderateScale } from '@utils/ThemeUtil';
 
 // Components
-import { CBIcon, CBHeader, CBImage, CBText, CBView, CBButton, ScreenContainer } from '@components/index';
+import { CBHeader, CBImage, CBText, CBView, CBButton, ScreenContainer } from '@components/index';
 import WithLoading from '@components/hoc/WithLoading';
 
 // Hooks
@@ -22,7 +22,6 @@ import colors from '@configs/colors';
 // Types
 import { MovieDetail } from '@stores/MoviesStore';
 
-// Define the navigation param list type directly here if import doesn't work
 type RootStackParamList = {
   Home: undefined;
   Watchlist: undefined;
@@ -62,9 +61,8 @@ const MovieDetailScreen: React.FC = observer(() => {
     try {
       setLoading(true);
       setError(null);
-
       const movieDetail = await moviesStore.getMovieDetails(movieId);
-
+      
       if (!movieDetail) {
         setError('Failed to load movie details. Please try again.');
       } else {
@@ -79,68 +77,40 @@ const MovieDetailScreen: React.FC = observer(() => {
   };
 
   /**
-   * Handle retry button press
+   * Format release date and runtime information
    */
-  const handleRetry = () => {
-    fetchMovieDetails();
-  };
-
-  /**
-   * Format release date with region information
-   * @param releaseDate - Release date string
-   * @param region - Region code (optional)
-   */
-  const formatReleaseInfo = (releaseDate: string, region?: string) => {
+  const formatReleaseInfo = useCallback((releaseDate: string, region?: string) => {
     if (!releaseDate) return 'N/A';
     const formattedDate = DateUtil.formatDate(releaseDate, 'YYYY-MM-DD', 'DD/MM/YYYY');
     return region ? `${formattedDate} (${region})` : formattedDate;
-  };
+  }, []);
 
-  /**
-   * Format runtime to hours and minutes
-   * @param minutes - Runtime in minutes
-   */
-  const formatRuntime = (minutes: number) => {
+  const formatRuntime = useCallback((minutes: number) => {
     if (!minutes) return '';
     const hours = Math.floor(minutes / 60);
     const remainingMinutes = minutes % 60;
     return `${hours}h ${remainingMinutes}m`;
-  };
+  }, []);
 
   /**
-   * Handle add to watchlist button press
+   * Handle watchlist operations
    */
+  const isInWatchlist = useCallback((): boolean => {
+    if (!movie) return false;
+    return moviesStore.isInWatchlist(movie.id);
+  }, [movie, moviesStore]);
+
   const handleAddToWatchlist = async () => {
-    if (!movie) {
-      console.error('Cannot add to watchlist: Movie data is undefined');
-      return;
-    }
+    if (!movie) return;
     
-    // Reset states
     setIsAddingToWatchlist(true);
     setActionSuccess(false);
     setWatchlistError(null);
     
-    console.log(`Attempting to ${isInWatchlist() ? 'remove from' : 'add to'} watchlist: ${movie.title} (ID: ${movie.id})`);
-    
     try {
-      // Call the async toggleWatchlist method
-      const result = await moviesStore.toggleWatchlist(movie);
-      
-      // Show success state briefly
+      await moviesStore.toggleWatchlist(movie);
       setActionSuccess(true);
       
-      // Log the result
-      console.log('Watchlist toggle result:', result);
-      console.log(result 
-        ? `Added "${movie.title}" to watchlist` 
-        : `Removed "${movie.title}" from watchlist`
-      );
-      
-      // Check if the movie is now in the watchlist
-      console.log('Is movie in watchlist after operation?', moviesStore.isInWatchlist(movie.id));
-      
-      // Clear success state after a delay
       setTimeout(() => {
         setActionSuccess(false);
       }, 1500);
@@ -148,7 +118,6 @@ const MovieDetailScreen: React.FC = observer(() => {
       console.error('Error toggling watchlist status:', error);
       setWatchlistError('Failed to update watchlist. Please try again.');
       
-      // Clear error after a delay
       setTimeout(() => {
         setWatchlistError(null);
       }, 3000);
@@ -157,24 +126,12 @@ const MovieDetailScreen: React.FC = observer(() => {
     }
   };
 
-  /**
-   * Check if the current movie is in the watchlist
-   */
-  const isInWatchlist = (): boolean => {
-    if (!movie) return false;
-    return moviesStore.isInWatchlist(movie.id);
-  };
-
-  /**
-   * Handle back button press
-   */
-  const handleBackPress = () => {
-    navigation.goBack();
-  };
+  const handleBackPress = () => navigation.goBack();
+  const handleRetry = () => fetchMovieDetails();
 
   // Create the content component
   const MovieDetailContentComponent = () => {
-    // Show error state if there's an error
+    // Show error state
     if (error) {
       return (
         <CBView style={styles.errorContainer}>
@@ -195,7 +152,7 @@ const MovieDetailScreen: React.FC = observer(() => {
       );
     }
 
-    // Show empty state if no movie data
+    // Show empty state
     if (!movie && !loading) {
       return (
         <CBView style={styles.errorContainer}>
@@ -411,7 +368,6 @@ const MovieDetailScreen: React.FC = observer(() => {
                 >
                   {movie?.credits?.cast?.slice(0, 10).map((actor) => (
                     <CBView key={actor.id} style={styles.castCard}>
-          
                       <CBImage
                         source={{
                           uri: actor.profile_path
@@ -455,8 +411,6 @@ const MovieDetailScreen: React.FC = observer(() => {
       statusBarHidden={false}
     >
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-
-      {/* Movie Detail Content */}
       <MovieDetailContent loading={loading} />
     </ScreenContainer>
   );

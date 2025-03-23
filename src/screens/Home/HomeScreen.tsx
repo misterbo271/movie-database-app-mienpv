@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { StyleSheet, FlatList, ScrollView, View, TouchableOpacity, Keyboard, TouchableWithoutFeedback, AppState, AppStateStatus } from 'react-native';
+import { StyleSheet, FlatList, View, TouchableOpacity, Keyboard, TouchableWithoutFeedback, AppState, ScrollView, AppStateStatus } from 'react-native';
 import { observer } from 'mobx-react-lite';
 import { Icon } from '@rneui/themed';
 import { moderateScale } from '@utils/ThemeUtil';
@@ -210,7 +210,7 @@ const HomeScreen: React.FC = observer(() => {
   const appState = useRef(AppState.currentState);
   
   // Get data from store based on selected category
-  const getMoviesByCategory = (category: string): Movie[] => {
+  const getMoviesByCategory = useCallback((category: string): Movie[] => {
     switch (category) {
       case 'now_playing':
         return moviesStore.nowPlayingMovies;
@@ -221,12 +221,12 @@ const HomeScreen: React.FC = observer(() => {
       default:
         return [];
     }
-  };
+  }, [moviesStore]);
   
   // Get loading state from store
-  const getLoadingState = (category: MovieCategory): boolean => {
+  const getLoadingState = useCallback((category: MovieCategory): boolean => {
     return moviesStore.loading[category];
-  };
+  }, [moviesStore]);
   
   // Current movie list based on selected category
   const currentCategoryMovies = getMoviesByCategory(selectedCategory.value as MovieCategory);
@@ -304,7 +304,7 @@ const HomeScreen: React.FC = observer(() => {
   /**
    * Load saved category preference from AsyncStorage
    */
-  const loadCategoryPreference = async () => {
+  const loadCategoryPreference = useCallback(async () => {
     try {
       console.log('Attempting to load category preference from AsyncStorage...');
       const savedCategory = await AsyncStorage.getItem(STORAGE_KEYS.CATEGORY_PREFERENCE);
@@ -342,12 +342,12 @@ const HomeScreen: React.FC = observer(() => {
       console.error('Error loading category preference:', error);
       return CATEGORY_OPTIONS[0].value as MovieCategory;
     }
-  };
+  }, []);
   
   /**
    * Fetch movies for the given category
    */
-  const fetchCategoryMovies = (category: MovieCategory) => {
+  const fetchCategoryMovies = useCallback((category: MovieCategory) => {
     switch (category) {
       case 'now_playing':
         moviesStore.fetchNowPlayingMovies();
@@ -359,7 +359,7 @@ const HomeScreen: React.FC = observer(() => {
         moviesStore.fetchPopularMovies();
         break;
     }
-  };
+  }, [moviesStore]);
   
   /**
    * Handler for category selection
