@@ -7,12 +7,7 @@ import { Icon } from '@rneui/themed';
 import { moderateScale } from '@utils/ThemeUtil';
 
 // Components
-import CBView from '@components/CBView';
-import CBText from '@components/CBText';
-import CBImage from '@components/CBImage';
-import CBButton from '@components/CBButton';
-import CBHeader from '@components/CBHeader';
-import ScreenContainer from '@components/ScreenContainer';
+import { CBIcon, CBHeader, CBImage, CBText, CBView, CBButton, ScreenContainer } from '@components/index';
 import WithLoading from '@components/hoc/WithLoading';
 
 // Hooks
@@ -45,7 +40,7 @@ const MovieDetailScreen: React.FC = observer(() => {
   const navigation = useNavigation<MovieDetailScreenNavigationProp>();
   const route = useRoute<MovieDetailScreenRouteProp>();
   const { movieId } = route.params;
-  
+
   // Store and state
   const moviesStore = useMoviesStore();
   const [loading, setLoading] = useState<boolean>(true);
@@ -54,12 +49,12 @@ const MovieDetailScreen: React.FC = observer(() => {
   const [actionSuccess, setActionSuccess] = useState<boolean>(false);
   const [isAddingToWatchlist, setIsAddingToWatchlist] = useState<boolean>(false);
   const [watchlistError, setWatchlistError] = useState<string | null>(null);
-  
+
   // Get movie details when component mounts
   useEffect(() => {
     fetchMovieDetails();
   }, [movieId]);
-  
+
   /**
    * Fetch movie details from the API
    */
@@ -67,9 +62,9 @@ const MovieDetailScreen: React.FC = observer(() => {
     try {
       setLoading(true);
       setError(null);
-      
+
       const movieDetail = await moviesStore.getMovieDetails(movieId);
-      
+
       if (!movieDetail) {
         setError('Failed to load movie details. Please try again.');
       } else {
@@ -82,14 +77,14 @@ const MovieDetailScreen: React.FC = observer(() => {
       setLoading(false);
     }
   };
-  
+
   /**
    * Handle retry button press
    */
   const handleRetry = () => {
     fetchMovieDetails();
   };
-  
+
   /**
    * Format release date with region information
    * @param releaseDate - Release date string
@@ -100,7 +95,7 @@ const MovieDetailScreen: React.FC = observer(() => {
     const formattedDate = DateUtil.formatDate(releaseDate, 'YYYY-MM-DD', 'DD/MM/YYYY');
     return region ? `${formattedDate} (${region})` : formattedDate;
   };
-  
+
   /**
    * Format runtime to hours and minutes
    * @param minutes - Runtime in minutes
@@ -111,31 +106,31 @@ const MovieDetailScreen: React.FC = observer(() => {
     const remainingMinutes = minutes % 60;
     return `${hours}h ${remainingMinutes}m`;
   };
-  
+
   /**
    * Handle add to watchlist button press
    */
   const handleAddToWatchlist = async () => {
     if (!movie) return;
-    
+
     // Reset states
     setIsAddingToWatchlist(true);
     setActionSuccess(false);
     setWatchlistError(null);
-    
+
     try {
       // Call the async toggleWatchlist method
       const result = await moviesStore.toggleWatchlist(movie);
-      
+
       // Show success state briefly
       setActionSuccess(true);
-      
+
       // Log the result
-      console.log(result 
-        ? `Added "${movie.title}" to watchlist` 
+      console.log(result
+        ? `Added "${movie.title}" to watchlist`
         : `Removed "${movie.title}" from watchlist`
       );
-      
+
       // Clear success state after a delay
       setTimeout(() => {
         setActionSuccess(false);
@@ -143,7 +138,7 @@ const MovieDetailScreen: React.FC = observer(() => {
     } catch (error) {
       console.error('Error toggling watchlist status:', error);
       setWatchlistError('Failed to update watchlist. Please try again.');
-      
+
       // Clear error after a delay
       setTimeout(() => {
         setWatchlistError(null);
@@ -152,7 +147,7 @@ const MovieDetailScreen: React.FC = observer(() => {
       setIsAddingToWatchlist(false);
     }
   };
-  
+
   /**
    * Check if the current movie is in the watchlist
    */
@@ -160,14 +155,14 @@ const MovieDetailScreen: React.FC = observer(() => {
     if (!movie) return false;
     return moviesStore.isInWatchlist(movie.id);
   };
-  
+
   /**
    * Handle back button press
    */
   const handleBackPress = () => {
     navigation.goBack();
   };
-  
+
   // Create the content component
   const MovieDetailContentComponent = () => {
     // Show error state if there's an error
@@ -190,7 +185,7 @@ const MovieDetailScreen: React.FC = observer(() => {
         </CBView>
       );
     }
-    
+
     // Show empty state if no movie data
     if (!movie && !loading) {
       return (
@@ -211,62 +206,83 @@ const MovieDetailScreen: React.FC = observer(() => {
         </CBView>
       );
     }
-    
+
     return (
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {movie && (
           <>
-            {/* Header with Title and Year - Now using CBHeader */}
-            <CBHeader 
-              type="detail"
-              title={`${movie.title} ${movie.release_date ? `(${movie.release_date.substring(0, 4)})` : ''}`}
-              backgroundColor="#4BA5D1"
-              showBackButton={true}
-              onBackPress={handleBackPress}
-            />
-            
-            {/* Movie Info Section */}
-            <CBView style={styles.infoSection}>
-              {/* Basic Info Row */}
-              <CBView style={styles.infoRow}>
-                <CBText variant="body" style={styles.infoLabel}>
-                  PG13
-                </CBText>
-                
-                <CBText variant="body" style={styles.infoText}>
-                  {movie.release_date && formatReleaseInfo(movie.release_date, 'SG')} • {formatRuntime(movie.runtime)}
-                </CBText>
-              </CBView>
-              
-              {/* Genre Row */}
-              <CBView style={styles.infoRow}>
-                <CBText variant="body" style={styles.genreText}>
-                  {movie.genres?.map((genre, index) => (
-                    `${genre.name}${index < movie.genres.length - 1 ? ', ' : ''}`
-                  )).join('')}
-                </CBText>
-              </CBView>
-              
-              {/* Status and Language */}
-              <CBView style={styles.infoRow}>
-                <CBText variant="body" style={styles.infoLabel}>
-                  Status:
-                </CBText>
-                <CBText variant="body" style={styles.infoValue}>
-                  {movie.status}
-                </CBText>
-              </CBView>
-              
-              <CBView style={styles.infoRow}>
-                <CBText variant="body" style={styles.infoLabel}>
-                  Original Language:
-                </CBText>
-                <CBText variant="body" style={styles.infoValue}>
-                  {movie.original_language?.toUpperCase()}
-                </CBText>
+          <ScreenContainer contentContainerStyle={{paddingTop: moderateScale(0), paddingHorizontal: 0}} backgroundColor={colors.whiteColor}>
+              <CBHeader
+                type="logo"
+                backgroundColor={colors.whiteColor}
+              />
+            {/* Header with Title and Year */}
+            <CBView style={styles.headerContainer}>
+              <CBHeader
+                type="detail"
+                title={`${movie.title}`}
+                subtitle={`(${movie.release_date ? movie.release_date.substring(0, 4) : ''})`}
+                backgroundColor="#4C95C3"
+                textColor={colors.whiteColor}
+                showBackButton={true}
+                onBackPress={handleBackPress}
+              />
+            </CBView>
+
+            <CBView style={styles.contentContainer}>
+                <CBImage
+                    source={{uri: moviesStore.getPosterUrl(movie?.poster_path)}}
+                    style={styles.poster}
+                    resizeMode="cover"
+                />
+              <CBView style={styles.infoSection}>
+                {/* Rating Badge */}
+                <CBView style={styles.ratingBadge}>
+                  <CBText variant="body" style={styles.ratingText}>
+                    PG13
+                  </CBText>
+                </CBView>
+
+                {/* Info Row */}
+                <CBView style={styles.infoRow}>
+                  <CBText variant="body" style={styles.infoText}>
+                    {movie.release_date && formatReleaseInfo(movie.release_date, 'SG')} • {formatRuntime(movie.runtime)}
+                  </CBText>
+                </CBView>
+
+                {/* Genre Row */}
+                <CBView style={styles.infoRow}>
+                  <CBText variant="body" style={styles.genreText}>
+                    {movie.genres?.map((genre, index) => (
+                        `${genre.name}${index < movie.genres.length - 1 ? ', ' : ''}`
+                    )).join('')}
+                  </CBText>
+                </CBView>
+
+                {/* Status and Language */}
+                <CBView style={styles.statusRow}>
+                  <CBView style={styles.statusItem}>
+                    <CBText variant="body" style={styles.infoLabel}>
+                      Status:
+                    </CBText>
+                    <CBText variant="body" style={styles.infoValue}>
+                      {movie.status}
+                    </CBText>
+                  </CBView>
+
+                  <CBView style={styles.statusItem}>
+                    <CBText variant="body" style={styles.infoLabel}>
+                      Original Language:
+                    </CBText>
+                    <CBText variant="body" style={styles.infoValue}>
+                      {movie.original_language?.toUpperCase()}
+                    </CBText>
+                  </CBView>
+                </CBView>
               </CBView>
             </CBView>
-            
+            {/* Movie Info Section */}
+
             {/* User Score Section */}
             <CBView style={styles.userScoreSection}>
               <CBView style={styles.scoreCircle}>
@@ -278,7 +294,7 @@ const MovieDetailScreen: React.FC = observer(() => {
                 User Score
               </CBText>
             </CBView>
-            
+
             {/* Credits Section */}
             <CBView style={styles.creditsSection}>
               {movie.credits?.crew?.some(person => person.job === 'Director') && (
@@ -294,14 +310,14 @@ const MovieDetailScreen: React.FC = observer(() => {
                   </CBText>
                 </CBView>
               )}
-              
-              {movie.credits?.crew?.some(person => 
+
+              {movie.credits?.crew?.some(person =>
                 person.department === 'Writing' || person.job === 'Screenplay' || person.job === 'Story'
               ) && (
                 <CBView style={styles.creditItem}>
                   <CBText variant="h5" style={styles.creditName}>
                     {movie.credits.crew
-                      .filter(person => 
+                      .filter(person =>
                         person.department === 'Writing' || person.job === 'Screenplay' || person.job === 'Story'
                       )
                       .slice(0, 2)
@@ -314,7 +330,7 @@ const MovieDetailScreen: React.FC = observer(() => {
                 </CBView>
               )}
             </CBView>
-            
+
             {/* Tagline */}
             {movie.tagline && (
               <CBView style={styles.taglineContainer}>
@@ -323,7 +339,7 @@ const MovieDetailScreen: React.FC = observer(() => {
                 </CBText>
               </CBView>
             )}
-            
+
             {/* Overview Section */}
             <CBView style={styles.overviewSection}>
               <CBText variant="h4" style={styles.sectionTitle}>
@@ -333,15 +349,15 @@ const MovieDetailScreen: React.FC = observer(() => {
                 {movie.overview || 'No overview available.'}
               </CBText>
             </CBView>
-            
+
             {/* Add to Watchlist Button */}
             <CBView style={styles.watchlistButtonContainer}>
               <CBButton
                 title={
-                  actionSuccess 
-                    ? "Success!" 
-                    : isInWatchlist() 
-                      ? "Remove From Watchlist" 
+                  actionSuccess
+                    ? "Success!"
+                    : isInWatchlist()
+                      ? "Remove From Watchlist"
                       : "Add To Watchlist"
                 }
                 variant={actionSuccess ? "secondary" : "primary"}
@@ -350,37 +366,38 @@ const MovieDetailScreen: React.FC = observer(() => {
                 loading={isAddingToWatchlist}
                 leftIcon={
                   !isAddingToWatchlist && (
-                    <Icon 
-                      name={actionSuccess 
-                        ? "check-circle" 
-                        : isInWatchlist() 
-                          ? "bookmark" 
+                    <Icon
+                      name={actionSuccess
+                        ? "check-circle"
+                        : isInWatchlist()
+                          ? "bookmark"
                           : "bookmark-outline"
-                      } 
-                      type="material-community" 
-                      color={colors.whiteColor} 
+                      }
+                      type="material-community"
+                      color={colors.whiteColor}
                       size={20}
-                      style={styles.buttonIcon} 
+                      style={styles.buttonIcon}
                     />
                   )
                 }
               />
-              
+
               {watchlistError && (
                 <CBText variant="caption" style={styles.errorMessage}>
                   {watchlistError}
                 </CBText>
               )}
             </CBView>
+          </ScreenContainer>
           </>
         )}
       </ScrollView>
     );
   };
-  
+
   // Apply the WithLoading HOC
   const MovieDetailContent = WithLoading(MovieDetailContentComponent);
-  
+
   return (
     <ScreenContainer
       withPadding={false}
@@ -391,7 +408,7 @@ const MovieDetailScreen: React.FC = observer(() => {
       statusBarHidden={false}
     >
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-      
+
       {/* Movie Detail Content */}
       <MovieDetailContent loading={loading} />
     </ScreenContainer>
@@ -403,46 +420,72 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.whiteColor,
   },
-  headerContainer: {
-    backgroundColor: '#4BA5D1', // Light blue header color
-    paddingTop: moderateScale(70),
-    paddingBottom: moderateScale(30),
-    paddingHorizontal: moderateScale(20),
-    width: '100%',
+  contentContainer: {
+    backgroundColor: '#4C95C3',
+    flexDirection: 'row',
+    paddingBottom: moderateScale(40),
   },
-  movieTitleHeader: {
-    color: colors.whiteColor,
-    fontSize: moderateScale(24),
-    fontWeight: 'bold',
-    textAlign: 'center',
+  headerContainer: {
+    width: '100%',
+    backgroundColor: '#4C95C3',
   },
   infoSection: {
-    backgroundColor: '#4BA5D1', // Same light blue as header
-    paddingHorizontal: moderateScale(20),
-    paddingBottom: moderateScale(20),
+    backgroundColor: '#4C95C3',
+    padding: moderateScale(16),
+    paddingTop: moderateScale(0),
+  },
+  ratingBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: moderateScale(8),
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.5)',
+    paddingVertical: moderateScale(4),
+    borderRadius: moderateScale(4),
+    marginBottom: moderateScale(10),
+  },
+  ratingText: {
+    color: colors.whiteColor,
+    fontSize: moderateScale(16),
+  },
+  poster: {
+    marginLeft: moderateScale(24),
+    borderRadius: moderateScale(8),
+    width: moderateScale(112),
+    height: moderateScale(145),
   },
   infoRow: {
+    marginBottom: moderateScale(8),
+  },
+  infoText: {
+    color: colors.whiteColor,
+    fontSize: moderateScale(16),
+  },
+  genreText: {
+    color: colors.whiteColor,
+    fontSize: moderateScale(16),
+  },
+  statusRow: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+  },
+  statusItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: moderateScale(6),
+    marginBottom: moderateScale(4),
   },
   infoLabel: {
     color: colors.whiteColor,
     fontWeight: 'bold',
     marginRight: moderateScale(8),
-  },
-  infoText: {
-    color: colors.whiteColor,
+    fontSize: moderateScale(16),
   },
   infoValue: {
     color: colors.whiteColor,
-  },
-  genreText: {
-    color: colors.whiteColor,
+    fontSize: moderateScale(16),
   },
   userScoreSection: {
-    backgroundColor: '#64B5D9', // Slightly lighter blue
-    padding: moderateScale(20),
+    backgroundColor: '#5BA0CC',
+    padding: moderateScale(16),
     flexDirection: 'row',
     alignItems: 'center',
   },
@@ -450,17 +493,14 @@ const styles = StyleSheet.create({
     width: moderateScale(60),
     height: moderateScale(60),
     borderRadius: moderateScale(30),
-    backgroundColor: '#28a745', // Green for score
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: moderateScale(15),
-    borderWidth: 3,
-    borderColor: 'rgba(255,255,255,0.2)',
+    marginRight: moderateScale(16),
   },
   scoreText: {
     color: colors.whiteColor,
     fontWeight: 'bold',
-    fontSize: moderateScale(22),
   },
   userScoreLabel: {
     color: colors.whiteColor,
@@ -514,18 +554,6 @@ const styles = StyleSheet.create({
   buttonIcon: {
     marginRight: moderateScale(8),
   },
-  backButton: {
-    position: 'absolute',
-    top: moderateScale(40),
-    left: moderateScale(16),
-    zIndex: 100,
-    width: moderateScale(36),
-    height: moderateScale(36),
-    borderRadius: moderateScale(18),
-    backgroundColor: 'rgba(0,0,0,0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -553,4 +581,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default MovieDetailScreen; 
+export default MovieDetailScreen;

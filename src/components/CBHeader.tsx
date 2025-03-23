@@ -18,37 +18,37 @@ export type CBHeaderProps = {
    * - 'detail': Shows a title with optional back button
    */
   type?: 'logo' | 'detail';
-  
+
   /**
    * Title text to display (for detail header)
    */
   title?: string;
-  
+
   /**
    * Subtitle text to display (for detail header)
    */
   subtitle?: string;
-  
+
   /**
    * Whether to show a back button (for detail header)
    */
   showBackButton?: boolean;
-  
+
   /**
    * Handler for back button press
    */
   onBackPress?: () => void;
-  
+
   /**
    * Background color for the header
    */
   backgroundColor?: string;
-  
+
   /**
    * Text color for the header
    */
   textColor?: string;
-  
+
   /**
    * Additional style for the container
    */
@@ -73,40 +73,40 @@ const CBHeader: React.FC<CBHeaderProps> = ({
   if (type === 'logo') {
     return (
       <CBView style={[styles.logoHeader, { backgroundColor }, containerStyle]}>
-        <CBImage 
-          source="ic_logo" 
-          style={styles.logo} 
+        <CBImage
+          source="ic_logo"
+          style={styles.logo}
           resizeMode="contain"
         />
       </CBView>
     );
   }
-  
+
   // Render detail header (e.g. MovieDetailScreen)
   return (
     <View style={[styles.detailHeader, { backgroundColor }, containerStyle]}>
       {showBackButton && (
-        <TouchableOpacity 
-          style={styles.backButton} 
+        <TouchableOpacity
+          style={styles.backButton}
           onPress={onBackPress}
           disabled={!onBackPress}
         >
-          <Icon 
-            name="chevron-left" 
-            type="material-community" 
-            color={textColor} 
-            size={30} 
+          <Icon
+            name="chevron-left"
+            type="material-community"
+            color={textColor}
+            size={36}
           />
         </TouchableOpacity>
       )}
-      
+
       <CBView style={styles.titleContainer}>
         <CBText variant="h3" style={[styles.title, { color: textColor }]}>
           {title}
         </CBText>
-        
+
         {subtitle && (
-          <CBText variant="caption" style={[styles.subtitle, { color: textColor }]}>
+          <CBText variant="h4" style={[styles.subtitle, { color: textColor }]}>
             {subtitle}
           </CBText>
         )}
@@ -124,11 +124,11 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   logo: {
-    width: moderateScale(150), 
+    width: moderateScale(150),
     height: moderateScale(50),
   },
   detailHeader: {
-    paddingTop: moderateScale(70),
+    paddingVertical: moderateScale(24),
     paddingBottom: moderateScale(30),
     paddingHorizontal: moderateScale(20),
     width: '100%',
@@ -136,23 +136,25 @@ const styles = StyleSheet.create({
   },
   backButton: {
     position: 'absolute',
-    top: moderateScale(40),
-    left: moderateScale(16),
+    top: moderateScale(24),
+    left: moderateScale(8),
     zIndex: 100,
     width: moderateScale(36),
     height: moderateScale(36),
     borderRadius: moderateScale(18),
-    backgroundColor: 'rgba(0,0,0,0.1)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   titleContainer: {
+    justifyContent: 'center',
+    flexDirection: 'row',
     alignItems: 'center',
   },
   title: {
     fontSize: moderateScale(24),
-    fontWeight: 'bold',
+    fontWeight: 'semibold',
     textAlign: 'center',
+    marginRight: moderateScale(8),
   },
   subtitle: {
     marginTop: moderateScale(4),
@@ -161,4 +163,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default CBHeader; 
+export default CBHeader;
