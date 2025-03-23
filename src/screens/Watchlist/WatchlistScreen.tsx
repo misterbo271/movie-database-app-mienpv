@@ -119,6 +119,14 @@ const WatchlistScreen: React.FC = observer(() => {
     
     // Check if the current watchlist count is different from the previous one
     const currentWatchlistCount = moviesStore.watchlistMovies.length;
+    
+    // If both previous and current watchlist are empty, don't reload
+    if (previousDataRef.current.watchlistCount === 0 && currentWatchlistCount === 0) {
+      console.log('Watchlist is empty, skipping reload');
+      return false;
+    }
+    
+    // If watchlist count changed, reload
     if (currentWatchlistCount !== previousDataRef.current.watchlistCount) {
       console.log(`Watchlist count changed: ${previousDataRef.current.watchlistCount} -> ${currentWatchlistCount}`);
       return true;
@@ -240,8 +248,12 @@ const WatchlistScreen: React.FC = observer(() => {
       // Set the removing movie ID
       setRemovingMovieId(movieId);
       
-      // Call the async method
-      await moviesStore.removeFromWatchlist(movieId);
+      // Get the movie object from watchlist
+      const movie = moviesStore.watchlistMovies.find(m => m.id === movieId);
+      if (movie) {
+        // Call toggleWatchlist instead of removeFromWatchlist
+        await moviesStore.toggleWatchlist(movie);
+      }
       
     } catch (error) {
       console.error('Error removing movie from watchlist:', error);
