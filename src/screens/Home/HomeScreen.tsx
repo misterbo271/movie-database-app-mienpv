@@ -34,7 +34,7 @@ const STORAGE_KEYS = {
  * Sort options for movie lists
  */
 const SORT_OPTIONS: DropdownOption[] = [
-  { label: 'By alphabetical order', value: 'title.desc' },
+  { label: 'By alphabetical order', value: 'title.asc' },
   { label: 'By rating', value: 'vote_average.desc' },
   { label: 'By release date', value: 'primary_release_date.desc' },
 ];
@@ -231,6 +231,56 @@ const HomeScreen: React.FC = observer(() => {
   // Current movie list based on selected category
   const currentCategoryMovies = getMoviesByCategory(selectedCategory.value as MovieCategory);
   
+  // Sort movies based on the selected sort option
+  const sortedMovies = useMemo(() => {
+    if (!currentCategoryMovies || currentCategoryMovies.length === 0) {
+      return [];
+    }
+    
+    // Create a copy to avoid mutating the original data
+    const moviesCopy = [...currentCategoryMovies];
+    
+    // Get sort field and direction from the selected sort option
+    const [field, direction] = selectedSort.value.split('.');
+    const isAscending = direction === 'asc';
+    
+    console.log(`Sorting movies by ${field} in ${direction} order`);
+    
+    return moviesCopy.sort((a, b) => {
+      let valueA, valueB;
+      
+      // Handle special case for sorting by rating
+      if (field === 'vote_average') {
+        valueA = a.vote_average || 0;
+        valueB = b.vote_average || 0;
+      }
+      // Handle special case for title (case insensitive)
+      else if (field === 'title') {
+        valueA = a.title?.toLowerCase() || '';
+        valueB = b.title?.toLowerCase() || '';
+      }
+      // Handle special case for release date
+      else if (field === 'primary_release_date') {
+        valueA = a.release_date ? new Date(a.release_date).getTime() : 0;
+        valueB = b.release_date ? new Date(b.release_date).getTime() : 0;
+      }
+      // Default fallback
+      else {
+        valueA = (a as any)[field] || '';
+        valueB = (b as any)[field] || '';
+      }
+      
+      // Apply sort direction
+      if (valueA < valueB) {
+        return isAscending ? -1 : 1;
+      }
+      if (valueA > valueB) {
+        return isAscending ? 1 : -1;
+      }
+      return 0;
+    });
+  }, [currentCategoryMovies, selectedSort.value]);
+  
   // Popular movies for bottom grid (if not already showing popular)
   const popularMovies = moviesStore.popularMovies;
   
@@ -342,21 +392,10 @@ const HomeScreen: React.FC = observer(() => {
     // Save the selected sort option
     setSelectedSort(option);
     
-    // If we're on the Popular category, apply the sort
-    if (selectedCategory.value === 'popular') {
-      console.log(`Applying sort ${option.value} to Popular movies...`);
-      
-      // Reset visible movies count
-      setVisibleMovies(5);
-      
-      // Fetch with the new sort option
-      moviesStore.fetchPopularMoviesSorted(option.value);
-      
-      // Close the dropdown
-      setIsSortDropdownOpen(false);
-    } else {
-      console.log(`Sort not applied - current category is ${selectedCategory.value}, not popular`);
-    }
+    // Reset visible movies count
+    setVisibleMovies(5);
+    
+    // No need to call API - sorting happens in the useMemo
   };
 
   /**
@@ -664,8 +703,8 @@ const HomeScreen: React.FC = observer(() => {
     const isCategoryLoading = getLoadingState(selectedCategory.value as MovieCategory);
     
     // Limit visible movies
-    const limitedMovies = currentCategoryMovies.slice(0, visibleMovies);
-    const hasMoreMovies = currentCategoryMovies.length > visibleMovies;
+    const limitedMovies = sortedMovies.slice(0, visibleMovies);
+    const hasMoreMovies = sortedMovies.length > visibleMovies;
     
     return (
       <CBView style={styles.moviesContainer}>
