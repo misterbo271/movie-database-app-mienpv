@@ -351,7 +351,7 @@ const MovieDetailScreen: React.FC = observer(() => {
 
               {/* Overview Section */}
               <CBView style={styles.overviewSection}>
-                <CBText variant="h2" style={styles.sectionTitle}>
+                <CBText variant="h3" style={styles.sectionTitle}>
                   Overview
                 </CBText>
                 <CBText style={styles.overviewText}>
@@ -397,6 +397,41 @@ const MovieDetailScreen: React.FC = observer(() => {
                     {watchlistError}
                   </CBText>
                 )}
+              </CBView>
+
+              {/* Top Billed Cast Section */}
+              <CBView style={styles.castSection}>
+                <CBText variant="h2" style={styles.sectionTitleBilledCast}>
+                  Top Billed Cast
+                </CBText>
+                <ScrollView 
+                  horizontal 
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.castScrollContent}
+                >
+                  {movie?.credits?.cast?.slice(0, 10).map((actor) => (
+                    <CBView key={actor.id} style={styles.castCard}>
+          
+                      <CBImage
+                        source={{
+                          uri: actor.profile_path
+                            ? moviesStore.getPosterUrl(actor.profile_path)
+                            : 'https://via.placeholder.com/185x278?text=No+Image'
+                        }}
+                        style={styles.castImage}
+                        resizeMode="cover"
+                      />
+                      <CBView style={styles.castInfo}>
+                        <CBText numberOfLines={1} style={styles.castName}>
+                          {actor.name}
+                        </CBText>
+                        <CBText numberOfLines={1} style={styles.characterName}>
+                          {actor.character}
+                        </CBText>
+                      </CBView>
+                    </CBView>
+                  ))}
+                </ScrollView>
               </CBView>
             </CBView>
 
@@ -562,6 +597,11 @@ const styles = StyleSheet.create({
     marginBottom: moderateScale(10),
     color: colors.whiteColor,
   },
+  sectionTitleBilledCast: {
+    fontWeight: 'bold',
+    marginBottom: moderateScale(10),
+    color: colors.blackColor,
+  },
   overviewText: {
     fontWeight: 'regular',
     lineHeight: moderateScale(24),
@@ -608,6 +648,43 @@ const styles = StyleSheet.create({
     marginTop: moderateScale(8),
     textAlign: 'center',
     fontSize: moderateScale(14),
+  },
+  castSection: {
+    padding: moderateScale(20),
+    backgroundColor: colors.whiteColor,
+  },
+  castScrollContent: {
+    paddingVertical: moderateScale(16),
+  },
+  castCard: {
+    width: moderateScale(120),
+    marginRight: moderateScale(16),
+    borderRadius: moderateScale(8),
+    backgroundColor: colors.containerColor,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+    overflow: 'hidden',
+  },
+  castImage: {
+    width: moderateScale(120),
+    height: moderateScale(180),
+    backgroundColor: '#ddd',
+  },
+  castInfo: {
+    padding: moderateScale(8),
+  },
+  castName: {
+    fontWeight: 'bold',
+    fontSize: moderateScale(14),
+    color: colors.primaryTextColor,
+  },
+  characterName: {
+    fontSize: moderateScale(12),
+    color: colors.secondaryTextColor,
+    marginTop: moderateScale(4),
   },
 });
 

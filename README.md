@@ -1,97 +1,56 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# Movie Database App (Technical Test - Mien PV)
 
-# Getting Started
+A React Native mobile application for browsing movies using The Movie Database (TMDB) API.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+## Screenshots (iPhone 15 real device)
 
-## Step 1: Start Metro
+<div style="display: flex; flex-direction: row; flex-wrap: wrap; gap: 16px; justify-content: center;">
+  <img src="./screenshots/screen_1.png" width="240" alt="Home Screen" />
+  <img src="./screenshots/screen_2.png" width="240" alt="Search Results" />
+  <img src="./screenshots/screen_3.png" width="240" alt="Movie Details" />
+  <img src="./screenshots/screen_4.png" width="240" alt="Watchlist Screen" />
+  <img src="./screenshots/screen_5.png" width="240" alt="User Profile" />
+</div>
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+## App Demo
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+<div align="center">
+  <img src="./screenshots/app_demo.gif" width="300" alt="App Demo" />
+</div>
 
-```sh
-# Using npm
-npm start
+## Features
 
-# OR using Yarn
-yarn start
-```
+- Browse popular, top rated, upcoming and now playing movies
+- Search for movies by title
+- View detailed movie information including:
+  - Overview
+  - Release date
+  - Rating
+  - Cast
+  - Similar movies
+- Sort movies by popularity, rating or release date
+- Infinite scroll loading
+- Responsive grid layout
+- Clean and modern UI
 
-## Step 2: Build and run your app
+## Technical Details
 
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
+- Built with React Native and TypeScript
+- Uses TMDB API for movie data
+- State management with MobX
+- Custom reusable UI components
+- Optimized performance with:
+  - Efficient list rendering
+  - Image caching
+  - Debounced search
+  - Pagination
 
-### Android
+## Getting Started
 
-```sh
-# Using npm
-npm run android
+1. Clone the repository
+2. Install dependencies with `yarn install`
+3. Add your TMDB API key to `.env` file
+4. Run on iOS: `yarn ios`
+5. Run on Android: `yarn android`
 
-# OR using Yarn
-yarn android
-```
-
-### iOS
-
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
-
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
-
-```sh
-bundle install
-```
-
-Then, and every time you update your native dependencies, run:
-
-```sh
-bundle exec pod install
-```
-
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
-
-```sh
-# Using npm
-npm run ios
-
-# OR using Yarn
-yarn ios
-```
-
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
-
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
-
-## Step 3: Modify your app
-
-Now that you have successfully run the app, let's make changes!
-
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
-
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
-
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
-
-## Congratulations! :tada:
-
-You've successfully run and modified your React Native App. :partying_face:
-
-### Now what?
-
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
-
-# Troubleshooting
-
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
-
-# Learn More
-
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+Note: You'll need to add your screenshots to a `/screenshots` directory in the project root for the images to display properly.
