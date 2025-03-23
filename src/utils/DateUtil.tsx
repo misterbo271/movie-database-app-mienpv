@@ -137,6 +137,23 @@ export const daysBetweenDates = (
   return end.diff(start, 'days');
 };
 
+/**
+ * Get a formatted month and year from a date string (e.g., "August 2023")
+ * @param dateString - Date string to format
+ * @param inputFormat - Input format of the date string (default: 'YYYY-MM-DD')
+ * @returns Month and year string
+ */
+export const getFormattedMonthYear = (dateString: string, inputFormat: string = 'YYYY-MM-DD'): string => {
+  if (!dateString) return '';
+  
+  try {
+    return moment(dateString, inputFormat).format('MMMM YYYY');
+  } catch (error) {
+    console.error('Error formatting month/year:', error);
+    return '';
+  }
+};
+
 export default {
   getCurrentDate,
   getCurrentDateFormatted,
@@ -150,5 +167,6 @@ export default {
   formatDate,
   isDateInPast,
   isDateInFuture,
-  daysBetweenDates
+  daysBetweenDates,
+  getFormattedMonthYear
 }; 

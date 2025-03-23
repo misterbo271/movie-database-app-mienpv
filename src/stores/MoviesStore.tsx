@@ -67,6 +67,7 @@ export interface UserProfile {
   id: number;
   name: string;
   username: string;
+  created_at?: string;
   avatar?: {
     gravatar?: {
       hash: string;

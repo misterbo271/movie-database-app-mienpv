@@ -1,11 +1,13 @@
-import React, { useEffect, useState } from 'react';
-import { StyleSheet, FlatList, ScrollView, View, TouchableOpacity, Keyboard, TouchableWithoutFeedback } from 'react-native';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { StyleSheet, FlatList, ScrollView, View, TouchableOpacity, Keyboard, TouchableWithoutFeedback, AppState, AppStateStatus } from 'react-native';
 import { observer } from 'mobx-react-lite';
 import { Icon } from '@rneui/themed';
 import { moderateScale } from '@utils/ThemeUtil';
 import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../../src/types';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Hooks
 import { useMoviesStore } from '@hooks/useStores';
@@ -13,14 +15,8 @@ import { useMoviesStore } from '@hooks/useStores';
 // Components
 import colors from '@configs/colors';
 import CBDropdown, { DropdownOption } from '@components/CBDropdown';
-import CBImage from '@components/CBImage';
-import ScreenContainer from '@components/ScreenContainer';
-import CBView from '@components/CBView';
-import CBText from '@components/CBText';
-import CBInput from '@components/CBInput';
-import CBButton from '@components/CBButton';
-import CBCard from '@components/CBCard';
 import WithLoading from '@components/hoc/WithLoading';
+import { CBHeader, CBImage, CBText, CBView, CBButton, CBCard, ScreenContainer, CBInput } from '@components/index';
 
 // Utils
 import DateUtil from '@utils/DateUtil';
@@ -28,6 +24,11 @@ import TimeUtil from '@utils/TimeUtil';
 
 // Types
 import { Movie, MovieCategory } from '@stores/MoviesStore';
+
+// Storage key for category preference
+const STORAGE_KEYS = {
+  CATEGORY_PREFERENCE: '@movie_app:category_preference'
+};
 
 /**
  * Sort options for movie lists
@@ -205,6 +206,9 @@ const HomeScreen: React.FC = observer(() => {
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
   const [isSortDropdownOpen, setIsSortDropdownOpen] = useState<boolean>(false);
   
+  // App state reference
+  const appState = useRef(AppState.currentState);
+  
   // Get data from store based on selected category
   const getMoviesByCategory = (category: string): Movie[] => {
     switch (category) {
@@ -231,18 +235,69 @@ const HomeScreen: React.FC = observer(() => {
   const popularMovies = moviesStore.popularMovies;
   
   /**
-   * Handler for category selection
-   * @param option - The selected category option
+   * Save category preference to AsyncStorage
    */
-  const handleCategorySelect = (option: DropdownOption) => {
-    // Hide keyboard if showing
-    Keyboard.dismiss();
-    
-    setSelectedCategory(option);
-    setVisibleMovies(5); // Reset number of visible movies when changing category
-    const category = option.value as MovieCategory;
-    
-    // Fetch data if needed
+  const saveCategoryPreference = async (category: string) => {
+    try {
+      // Use the exact category value for storage
+      console.log(`Attempting to save category preference: ${category}`);
+      await AsyncStorage.setItem(STORAGE_KEYS.CATEGORY_PREFERENCE, category);
+      
+      // Verify the save by reading it back
+      const savedValue = await AsyncStorage.getItem(STORAGE_KEYS.CATEGORY_PREFERENCE);
+      console.log(`Verification - Category preference saved: ${savedValue}`);
+    } catch (error) {
+      console.error('Error saving category preference:', error);
+    }
+  };
+  
+  /**
+   * Load saved category preference from AsyncStorage
+   */
+  const loadCategoryPreference = async () => {
+    try {
+      console.log('Attempting to load category preference from AsyncStorage...');
+      const savedCategory = await AsyncStorage.getItem(STORAGE_KEYS.CATEGORY_PREFERENCE);
+      
+      console.log(`Raw saved category value from AsyncStorage: "${savedCategory}"`);
+      
+      if (savedCategory) {
+        console.log(`Loaded saved category preference: ${savedCategory}`);
+        // Find the category option that matches the saved value
+        const categoryOption = CATEGORY_OPTIONS.find(option => option.value === savedCategory);
+        
+        if (categoryOption) {
+          console.log(`Setting category to ${categoryOption.label}`);
+          setSelectedCategory(categoryOption);
+          
+          // Highlight the saved preference briefly to show it was restored
+          setTimeout(() => {
+            const flashMessage = `Restored your preference: ${categoryOption.label}`;
+            console.log(flashMessage);
+          }, 1000);
+          
+          // Fetch data for the saved category
+          fetchCategoryMovies(savedCategory as MovieCategory);
+          return savedCategory as MovieCategory;
+        } else {
+          console.warn(`Found saved category "${savedCategory}" but no matching option exists`);
+        }
+      } else {
+        console.log('No saved category preference found, using default');
+      }
+      
+      // If no saved preference or invalid, return default
+      return CATEGORY_OPTIONS[0].value as MovieCategory;
+    } catch (error) {
+      console.error('Error loading category preference:', error);
+      return CATEGORY_OPTIONS[0].value as MovieCategory;
+    }
+  };
+  
+  /**
+   * Fetch movies for the given category
+   */
+  const fetchCategoryMovies = (category: MovieCategory) => {
     switch (category) {
       case 'now_playing':
         moviesStore.fetchNowPlayingMovies();
@@ -254,6 +309,27 @@ const HomeScreen: React.FC = observer(() => {
         moviesStore.fetchPopularMovies();
         break;
     }
+  };
+  
+  /**
+   * Handler for category selection
+   * @param option - The selected category option
+   */
+  const handleCategorySelect = (option: DropdownOption) => {
+    // Hide keyboard if showing
+    Keyboard.dismiss();
+    
+    console.log(`HomeScreen: Category selected: ${option.label} (${option.value})`);
+    
+    setSelectedCategory(option);
+    setVisibleMovies(5); // Reset number of visible movies when changing category
+    const category = option.value as MovieCategory;
+    
+    // Save the selected category to persistent storage
+    saveCategoryPreference(category);
+    
+    // Fetch data for the selected category
+    fetchCategoryMovies(category);
   };
 
   /**
@@ -331,26 +407,145 @@ const HomeScreen: React.FC = observer(() => {
 
   // Load initial data
   useEffect(() => {
-    // Fetch data for initial category
-    const initialCategory = selectedCategory.value as MovieCategory;
-    
-    switch (initialCategory) {
-      case 'now_playing':
-        moviesStore.fetchNowPlayingMovies();
-        break;
-      case 'upcoming':
-        moviesStore.fetchUpcomingMovies();
-        break;
-      case 'popular':
+    const initializeApp = async () => {
+      console.log('HomeScreen: Initializing app, checking for saved category preference...');
+      
+      // Test AsyncStorage functionality
+      await testAsyncStorage();
+      
+      try {
+        // Get the saved category directly
+        const savedCategory = await AsyncStorage.getItem(STORAGE_KEYS.CATEGORY_PREFERENCE);
+        console.log(`Direct AsyncStorage read - Category: "${savedCategory}"`);
+        
+        if (savedCategory) {
+          const categoryOption = CATEGORY_OPTIONS.find(option => option.value === savedCategory);
+          
+          if (categoryOption) {
+            console.log(`HomeScreen: Setting initial category to ${categoryOption.label}`);
+            setSelectedCategory(categoryOption);
+            fetchCategoryMovies(savedCategory as MovieCategory);
+          } else {
+            console.warn(`Invalid saved category: ${savedCategory}`);
+            // Use default if invalid
+            fetchCategoryMovies(selectedCategory.value as MovieCategory);
+          }
+        } else {
+          console.log('No saved preference found, using default');
+          fetchCategoryMovies(selectedCategory.value as MovieCategory);
+        }
+      } catch (error) {
+        console.error('Error loading category preference:', error);
+        fetchCategoryMovies(selectedCategory.value as MovieCategory);
+      }
+      
+      // Load popular movies if they're not already being loaded
+      if (selectedCategory.value !== 'popular') {
         moviesStore.fetchPopularMovies();
-        break;
-    }
+      }
+      
+      // For development only - clear storage (uncomment to reset)
+      // await AsyncStorage.clear();
+      // console.log('Cleared all AsyncStorage data for testing');
+    };
     
-    // Load popular movies if they're not already being loaded
-    if (initialCategory !== 'popular') {
-      moviesStore.fetchPopularMovies();
-    }
+    initializeApp();
   }, []);
+  
+  // Add AppState listener for handling app coming to foreground
+  useEffect(() => {
+    // Handler for app state changes
+    const handleAppStateChange = async (nextAppState: AppStateStatus) => {
+      if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
+        console.log('App has come to the foreground - checking saved preferences');
+        
+        // Load and apply saved category preference
+        const savedCategory = await AsyncStorage.getItem(STORAGE_KEYS.CATEGORY_PREFERENCE);
+        console.log(`App resumed - saved category: ${savedCategory}, current: ${selectedCategory.value}`);
+        
+        if (savedCategory && savedCategory !== selectedCategory.value) {
+          console.log(`Applying saved category preference: ${savedCategory}`);
+          const categoryOption = CATEGORY_OPTIONS.find(option => option.value === savedCategory);
+          if (categoryOption) {
+            setSelectedCategory(categoryOption);
+            fetchCategoryMovies(savedCategory as MovieCategory);
+          }
+        }
+      }
+      
+      // Update the AppState reference
+      appState.current = nextAppState;
+    };
+    
+    // Subscribe to app state changes
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    
+    // Clean up the subscription on unmount
+    return () => {
+      subscription.remove();
+    };
+  }, [selectedCategory.value]); // Re-create when selected category changes
+  
+  /**
+   * Test function to verify AsyncStorage is working
+   */
+  const testAsyncStorage = async () => {
+    try {
+      // Test writing a value
+      const testKey = '@movie_app:test_key';
+      const testValue = 'test_' + new Date().toISOString();
+      await AsyncStorage.setItem(testKey, testValue);
+      console.log(`AsyncStorage Test: Wrote value: ${testValue}`);
+      
+      // Test reading the value back
+      const readValue = await AsyncStorage.getItem(testKey);
+      console.log(`AsyncStorage Test: Read value: ${readValue}`);
+      
+      if (readValue === testValue) {
+        console.log('AsyncStorage Test: SUCCESS - Read/write working correctly');
+      } else {
+        console.error('AsyncStorage Test: FAILED - Read value does not match written value');
+      }
+    } catch (error) {
+      console.error('AsyncStorage Test: ERROR - ', error);
+    }
+  };
+
+  /**
+   * Close all dropdowns when clicking outside
+   */
+  const closeAllDropdowns = () => {
+    console.log('Overlay clicked - closing all dropdowns');
+    if (isDropdownOpen) setIsDropdownOpen(false);
+    if (isSortDropdownOpen) setIsSortDropdownOpen(false);
+    Keyboard.dismiss();
+  };
+
+  /**
+   * Handler for category dropdown toggle
+   */
+  const handleCategoryDropdownToggle = (isOpen: boolean) => {
+    console.log(`Category dropdown toggled: ${isOpen ? 'open' : 'closed'}`);
+    setIsDropdownOpen(isOpen);
+    
+    // Close the other dropdown if opening this one
+    if (isOpen && isSortDropdownOpen) {
+      setIsSortDropdownOpen(false);
+    }
+  };
+  
+  /**
+   * Handler for sort dropdown toggle
+   */
+  const handleSortDropdownToggle = (isOpen: boolean) => {
+    console.log(`Sort dropdown toggled: ${isOpen ? 'open' : 'closed'}`);
+    setIsSortDropdownOpen(isOpen);
+    
+    // Close the other dropdown if opening this one
+    if (isOpen && isDropdownOpen) {
+      setIsDropdownOpen(false);
+    }
+  };
 
   /**
    * Render the header with logo and filters
@@ -358,24 +553,30 @@ const HomeScreen: React.FC = observer(() => {
   const renderHeader = () => (
     <>
       {/* Header with logo */}
-      <CBView style={styles.header}>
-        <CBImage 
-          source="ic_logo" 
-          style={{ width: moderateScale(150), height: moderateScale(50) }} 
-          resizeMode="contain"
-        />
-      </CBView>
+      <CBHeader 
+        type="logo"
+        backgroundColor={colors.whiteColor}
+      />
 
       {/* Filter section with dropdown and search */}
       <CBView style={styles.filterContainer}>
-        {/* Category dropdown */}
+        {/* Touchable overlay for closing dropdowns when clicking outside */}
+        {(isDropdownOpen || isSortDropdownOpen) && (
+          <TouchableOpacity
+            style={styles.dropdownOverlay}
+            activeOpacity={1}
+            onPress={closeAllDropdowns}
+          />
+        )}
+        
+        {/* Category dropdown with current selection */}
         <CBDropdown
           options={CATEGORY_OPTIONS}
           defaultValue={selectedCategory.value}
           onSelect={handleCategorySelect}
           containerStyle={[styles.dropdown, { zIndex: 1002 }]}
           isOpen={isDropdownOpen}
-          onToggleDropdown={setIsDropdownOpen}
+          onToggleDropdown={handleCategoryDropdownToggle}
         />
 
         {/* Sort dropdown */}
@@ -385,7 +586,7 @@ const HomeScreen: React.FC = observer(() => {
           onSelect={handleSortSelect}
           containerStyle={[styles.dropdown, { zIndex: 1001 }]}
           isOpen={isSortDropdownOpen}
-          onToggleDropdown={setIsSortDropdownOpen}
+          onToggleDropdown={handleSortDropdownToggle}
           label="Sort by"
         />
 
@@ -563,11 +764,12 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginBottom: 16,
     gap: 12,
+    position: 'relative',
   },
   dropdown: {
     marginBottom: 0,
     position: 'relative',
-    zIndex: 1000, // Higher z-index for category dropdown
+    zIndex: 1001,
   },
   filterButton: {
     flexDirection: 'row',
@@ -730,6 +932,17 @@ const styles = StyleSheet.create({
   },
   sortInfo: {
     color: colors.tertiaryTextColor,
+  },
+  dropdownOverlay: {
+    position: 'absolute',
+    top: -1000,
+    left: -1000,
+    right: -1000,
+    bottom: -1000,
+    width: 5000, // Much larger than screen
+    height: 5000, // Much larger than screen
+    backgroundColor: 'transparent',
+    zIndex: 1000,
   },
 });
 

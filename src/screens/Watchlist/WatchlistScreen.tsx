@@ -7,12 +7,9 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { Icon } from '@rneui/themed';
 
 // Components
-import CBView from '@components/CBView';
-import CBText from '@components/CBText';
-import CBImage from '@components/CBImage';
-import ScreenContainer from '@components/ScreenContainer';
-import CBCard from '@components/CBCard';
+import { CBHeader, CBIcon, CBImage, CBText, CBView, ScreenContainer } from '@components/index';
 import WithEmptyState from '@components/hoc/WithEmptyState';
+
 
 // Hooks
 import { useMoviesStore } from '@hooks/useStores';
@@ -264,9 +261,14 @@ const WatchlistScreen: React.FC = observer(() => {
    * Gets formatted registration date from profile
    */
   const getFormattedJoinDate = (): string => {
-    if (!moviesStore.userProfile) return 'Member';
+    if (!moviesStore.userProfile) return 'Member since August 2023';
     
-    // Use the username as a fallback if no creation date is available
+    // If there's an actual creation date, use it
+    if (moviesStore.userProfile.created_at) {
+      return `Member since ${DateUtil.getFormattedMonthYear(moviesStore.userProfile.created_at)}`;
+    }
+    
+    // Fallback to current month/year
     return `Member since ${DateUtil.getCurrentMonthYear()}`;
   };
   
@@ -404,26 +406,24 @@ const WatchlistScreen: React.FC = observer(() => {
   >;
 
   return (
-    <ScreenContainer contentContainerStyle={{paddingHorizontal: 0}} backgroundColor={colors.whiteColor}>
+    <ScreenContainer contentContainerStyle={{paddingHorizontal: 0, paddingTop: moderateScale(0)}} backgroundColor={colors.whiteColor}>
       {/* Header with logo */}
-      <CBView style={styles.header}>
-        <CBImage 
-          source="ic_logo" 
-          style={{ width: moderateScale(150), height: moderateScale(50) }} 
-          resizeMode="contain"
-        />
-      </CBView>
+      <CBHeader 
+        type="logo"
+        backgroundColor={colors.whiteColor}
+      />
       
       {/* User Profile Header */}
       <CBView style={styles.profileHeader}>
-        <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
-          <Icon name="chevron-left" type="material-community" size={30} color={colors.whiteColor} />
-        </TouchableOpacity>
+        <CBView style={styles.backButton}>
+          <CBIcon name="keyboard-arrow-left" type="material" size={36} color={colors.whiteColor} onPress={handleBackPress} />
+        </CBView>
         
-        <CBView style={styles.profileAvatarContainer}>
-          {renderAvatar()}
-          
-          <CBView style={styles.profileInfo}>
+        <CBView style={styles.profileContent}>
+          <CBView style={styles.profileAvatar}>
+            <CBText variant="h2" style={styles.avatarText}>{moviesStore.getUserInitial()}</CBText>
+          </CBView>
+          <CBView style={styles.profileDetails}>
             <CBText variant="h3" style={styles.profileName}>
               {moviesStore.userProfile?.name || moviesStore.userProfile?.username || 'User'}
             </CBText>
@@ -448,7 +448,7 @@ const WatchlistScreen: React.FC = observer(() => {
               style={styles.filterButton}
               onPress={() => setFilterMenuOpen(!filterMenuOpen)}
             >
-              <CBText variant="button">{selectedFilter.label}</CBText>
+              <CBText style={{fontSize: moderateScale(16), color: colors.primaryColor}} variant="button">{selectedFilter.label}</CBText>
               <Icon 
                 name={filterMenuOpen ? "chevron-up" : "chevron-down"} 
                 type="material-community" 
@@ -497,54 +497,49 @@ const WatchlistScreen: React.FC = observer(() => {
 });
 
 const styles = StyleSheet.create({
-  header: {
-    marginBottom: moderateScale(16),
-    paddingHorizontal: moderateScale(16),
-    alignItems: 'center',
-  },
   profileHeader: {
-    backgroundColor: colors.tabBarColor,
-    paddingTop: moderateScale(20),
+    backgroundColor: '#042541', // Dark blue color from the image
+    paddingTop: moderateScale(0),
     paddingBottom: moderateScale(28),
-    paddingHorizontal: moderateScale(32),
+    paddingHorizontal: moderateScale(16),
     position: 'relative',
   },
   backButton: {
-    position: 'absolute',
-    top: moderateScale(16),
-    left: moderateScale(16),
-    zIndex: 10,
+    alignItems: 'flex-start',
+    marginVertical: moderateScale(16),
   },
-  profileAvatarContainer: {
-    marginTop: moderateScale(36),
+  profileContent: {
     flexDirection: 'row',
     alignItems: 'center',
-
+    justifyContent: 'flex-start',
+    paddingVertical: moderateScale(10),
   },
   profileAvatar: {
-    width: moderateScale(70),
-    height: moderateScale(70),
-    borderRadius: moderateScale(35),
-    backgroundColor: '#8A56E2',
+    width: moderateScale(72),
+    height: moderateScale(72),
+    borderRadius: moderateScale(36),
+    backgroundColor: '#8A56E2', // Purple color for the avatar
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
+    marginRight: moderateScale(16),
+  },
+  profileDetails: {
+    justifyContent: 'center',
   },
   avatarText: {
     color: colors.whiteColor,
     fontSize: moderateScale(32),
     fontWeight: 'bold',
   },
-  profileInfo: {
-    marginLeft: moderateScale(24),
-  },
   profileName: {
     color: colors.whiteColor,
-    fontWeight: 'bold',
+    fontWeight: '600',
+    fontSize: moderateScale(22),
     marginBottom: moderateScale(4),
   },
   profileJoinDate: {
-    color: '#B8C2CC',
+    color: '#A4B0BC', // Light gray color for subtitle
     fontSize: moderateScale(14),
   },
   watchlistContainer: {
@@ -559,7 +554,6 @@ const styles = StyleSheet.create({
   },
   filterContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: moderateScale(16),
     zIndex: 100,
@@ -568,8 +562,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     position: 'relative',
+    marginRight: moderateScale(16),
   },
   filterLabel: {
+    fontSize: moderateScale(14),
     color: colors.tertiaryTextColor,
     marginRight: moderateScale(8),
   },
@@ -634,7 +630,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: colors.whiteColor,
     borderRadius: moderateScale(8),
-    marginBottom: moderateScale(12),
+    marginVertical: moderateScale(12),
     borderWidth: 1,
     borderColor: '#E3E3E3',
     shadowColor: '#000',
